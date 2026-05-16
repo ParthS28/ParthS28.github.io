@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Funkora";
+  src: url("./assets/fonts/funkora-font/Funkora-Demo.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Rigraf";
+  src: url("./assets/fonts/DX-Rigraf-Free/DXRigraf-SemiBoldExpanded.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+
+:root {
+  --color1: #000000;
+  --color2: #FFD700;
+  --color3: #007FFF;
+  --color4: #FF0000;
+  --color5: #C0C0C0;
+  --color6: #FF4500;
+  --text: var(--color5);
+  --text-h: var(--color1);
+  --bg: var(--color2);
+  --border: var(--color3);
+  --code-bg: var(--color6);
+  --accent: var(--color4);
+  --accent-bg: rgba(255, 215, 0, 0.1);
+  --accent-border: rgba(255, 215, 0, 0.5);
+  --social-bg: rgba(192, 192, 192, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  --sans: "Funkora", system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: "Rigraf", "Funkora", system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: light dark;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color1: #000000;
+    --color2: #FFD700;
+    --color3: #007FFF;
+    --color4: #FF0000;
+    --color5: #C0C0C0;
+    --color6: #FF4500;
+    --text: var(--color2);
+    --text-h: var(--color5);
+    --bg: var(--color1);
+    --border: var(--color3);
+    --code-bg: var(--color6);
+    --accent: var(--color4);
+    --accent-bg: rgba(255, 69, 0, 0.15);
+    --accent-border: rgba(255, 69, 0, 0.5);
+    --social-bg: rgba(255, 215, 0, 0.5);
+    --shadow:
+      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  }
+
+  #social .button-icon {
+    filter: invert(1) brightness(2);
+  }
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  font-family: var(--sans);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  text-align: center;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+h1,
+h2 {
+  font-family: var(--heading);
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+h1 {
+  font-size: 56px;
+  letter-spacing: -1.68px;
+  margin: 32px 0;
+  @media (max-width: 1024px) {
+    font-size: 36px;
+    margin: 20px 0;
+  }
+}
+h2 {
+  font-size: 24px;
+  line-height: 118%;
+  letter-spacing: -0.24px;
+  margin: 0 0 8px;
+  @media (max-width: 1024px) {
+    font-size: 20px;
+  }
+}
+p {
+  margin: 0;
+}
+
+code,
+.counter {
+  font-family: var(--mono);
+  display: inline-flex;
+  border-radius: 4px;
+  color: var(--text-h);
+}
+
+code {
+  font-size: 15px;
+  line-height: 135%;
+  padding: 4px 8px;
+  background: var(--code-bg);
+}

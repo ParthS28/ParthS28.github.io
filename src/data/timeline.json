@@ -1,0 +1,67 @@
+{
+  "title": "",
+  "description": "",
+  "entries": [
+    {
+      "id": "current job",
+      "period": "2026-Present",
+      "title": "Data Engineer @ HSBC",
+      "summary": "I joined the global markets team @HSBC in the Markets and Securities Services AI division as a Data Engineer, where we are building a data platform to support the bank's AI initiatives across all asset classes.",
+      "links": [],
+      "images": [
+        {
+          "src": "/assets/hsbc.png",
+          "alt": "HSBC Logo"
+        }
+      ]
+    },
+    {
+      "id": "first job",
+      "period": "2023-2026",
+      "title": "Software Engineer @ Wells Fargo",
+      "summary": "I had my first corporate exposure at Wells Fargo, where I worked on tech associated with the bank's liquidity risk management. In my time there, I got to work on a variety of projects, including building a pyspark based ETL framework that was capable of processing 20 GB of daily data, from multiple sources and loading to different types of targets. Built various kinds of automations which were presented to the CFO of the bank and CIO of Finance Technology.",
+      "links": [],
+      "images": [
+        {
+          "src": "/assets/wellsfargo.png",
+          "alt": "Wells Fargo Logo"
+        }
+      ]
+    },
+    {
+      "id": "GSOC",
+      "period": "2022",
+      "title": "Google Summer of Code @ Red Hen Lab",
+      "summary": "I got the opportunity to work with Red Hen Lab, in the Google Summer of Code program. I worked on a multimodal pipeline for identifying and tagging christian iconography in medieval art. The project involved building a pipeline that could process both text and images, and then using machine learning techniques to identify and tag the relevant iconography. The project was a great learning experience for me, as I got to work with a variety of technologies and learn about the challenges of working with multimodal data.",
+      "links": [
+        {
+          "label": "Project Repo",
+          "url": ""
+        },
+        {
+          "label": "Project Blog",
+          "url": ""
+        }
+      ],
+      "images": [
+        {
+          "src": "/assets/gsoc.png",
+          "alt": "Google Summer of Code Logo"
+        }
+      ]
+    },
+    {
+      "id": "college",
+      "period": "2019-2023",
+      "title": "Computer Science and Engineering @ MIT, Manipal",
+      "summary": "I joined MIT Manipal in 2019, and graduated in 2023 with a degree in Computer Science and Engineering. During my time at college, I was actively involved in various extracurricular activities, including being the Technical Head for ADG Manipal. My minor specialisation was in Big Data Analytics.",
+      "links": [],
+      "images": [
+        {
+          "src": "/assets/mit.jpeg",
+          "alt": "MIT Manipal Logo"
+        }
+      ]
+    }
+  ]
+}
