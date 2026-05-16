@@ -6,7 +6,7 @@
       "id": "current job",
       "period": "2026-Present",
       "title": "Data Engineer @ HSBC",
-      "summary": "I joined the global markets team @HSBC in the Markets and Securities Services AI division as a Data Engineer, where we are building a data platform to support the bank's AI initiatives across all asset classes.",
+      "summary": "I joined the Global Markets team at HSBC as part of the Markets and Securities Services AI division, where I work on building data platforms that support the bank's AI initiatives across multiple asset classes. It's been exciting to work at the intersection of large-scale data engineering and AI, while contributing to systems that are designed to power decision-making across the business.",
       "links": [],
       "images": [
         {
@@ -19,7 +19,7 @@
       "id": "first job",
       "period": "2023-2026",
       "title": "Software Engineer @ Wells Fargo",
-      "summary": "I had my first corporate exposure at Wells Fargo, where I worked on tech associated with the bank's liquidity risk management. In my time there, I got to work on a variety of projects, including building a pyspark based ETL framework that was capable of processing 20 GB of daily data, from multiple sources and loading to different types of targets. Built various kinds of automations which were presented to the CFO of the bank and CIO of Finance Technology.",
+      "summary": "Wells Fargo was where I got my first real exposure to working in large-scale enterprise technology. I worked on systems related to the bank's liquidity risk management and had the opportunity to contribute to a wide range of projects and AI initiatives. One of the highlights was building a PySpark-based ETL system capable of processing data daily from multiple upstream sources into different target systems. I also worked on several automation initiatives that were eventually showcased to senior leadership, including the CFO and the CIO of Finance Technology. More than anything, this role taught me how to build reliable systems, navigate large organizations, and think about engineering at scale.",
       "links": [],
       "images": [
         {
@@ -32,15 +32,15 @@
       "id": "GSOC",
       "period": "2022",
       "title": "Google Summer of Code @ Red Hen Lab",
-      "summary": "I got the opportunity to work with Red Hen Lab, in the Google Summer of Code program. I worked on a multimodal pipeline for identifying and tagging christian iconography in medieval art. The project involved building a pipeline that could process both text and images, and then using machine learning techniques to identify and tag the relevant iconography. The project was a great learning experience for me, as I got to work with a variety of technologies and learn about the challenges of working with multimodal data.",
+      "summary": "During Google Summer of Code, I had the opportunity to work with Red Hen Lab on a multimodal machine learning project focused on identifying and tagging Christian iconography in medieval art. The work involved building pipelines capable of processing both textual and visual data and applying machine learning techniques to connect the two. It was one of my first experiences working on research-oriented engineering problems, and it pushed me to think beyond traditional software development into the world of multimodal AI and data-driven experimentation.",
       "links": [
         {
           "label": "Project Repo",
-          "url": ""
+          "url": "https://github.com/ParthS28/gsoc22-christian-iconography"
         },
         {
           "label": "Project Blog",
-          "url": ""
+          "url": "https://parths28.github.io/emilemale.github.io/"
         }
       ],
       "images": [
@@ -54,7 +54,7 @@
       "id": "college",
       "period": "2019-2023",
       "title": "Computer Science and Engineering @ MIT, Manipal",
-      "summary": "I joined MIT Manipal in 2019, and graduated in 2023 with a degree in Computer Science and Engineering. During my time at college, I was actively involved in various extracurricular activities, including being the Technical Head for ADG Manipal. My minor specialisation was in Big Data Analytics.",
+      "summary": "I studied Computer Science and Engineering at MIT Manipal from 2019 to 2023, where I also pursued a minor specialization in Big Data Analytics. Beyond academics, a big part of my college experience came from being involved in student communities and technical initiatives. I served as the Technical Head of ADG Manipal, which gave me the chance to work closely with talented peers, organize events, and build projects outside the classroom. College was where I developed a strong interest in data systems, backend engineering, and AI systems.",
       "links": [],
       "images": [
         {

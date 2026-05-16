@@ -1,310 +1,236 @@
 import Matter from "matter-js";
 
+// ─── Score table ────────────────────────────────────────────────────────────
 export const PIECE_SCORES = {
-  bumper: 125,
-  sling: 60,
-  orbit: 40,
-  guide: 25,
-  lanePost: 90,
-  savePost: 35,
+  bumper:     150,
+  sling:       60,
+  orbit:       50,
+  guide:       20,
+  lanePost:   100,
+  savePost:    40,
+  flagTarget: 200,
+  wormhole:   300,
 };
 
-function drawRoundedRect(context, x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2);
-  context.beginPath();
-  context.moveTo(x + r, y);
-  context.arcTo(x + width, y, x + width, y + height, r);
-  context.arcTo(x + width, y + height, x, y + height, r);
-  context.arcTo(x, y + height, x, y, r);
-  context.arcTo(x, y, x + width, y, r);
-  context.closePath();
+// ─── Canvas art helpers ──────────────────────────────────────────────────────
+function star(ctx, cx, cy, r, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
-function drawPlayfieldArt(context, width, height, launchCharge, targets) {
+function glowCircle(ctx, cx, cy, r, color, alpha = 0.35) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  g.addColorStop(0, color);
+  g.addColorStop(1, "transparent");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawNeonLine(ctx, x1, y1, x2, y2, color, width = 2) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = color;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPlayfieldArt(ctx, W, H, launchCharge, targets) {
   const {
-    bumpers,
-    centerPost,
-    leftLanePost,
-    rightLanePost,
-    leftSavePost,
-    rightSavePost,
+    bumpers, wormholeBumper,
+    leftFlagTarget, rightFlagTarget,
+    leftSavePost, rightSavePost,
+    leftLanePost, rightLanePost,
   } = targets;
 
-  const playfield = [
-    [72, 42],
-    [308, 42],
-    [338, 122],
-    [352, 258],
-    [338, 520],
-    [290, 582],
-    [110, 582],
-    [62, 520],
-    [48, 258],
-    [62, 122],
-  ];
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-over";
 
-  context.save();
+  // Deep-space background
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0,    "#00001a");
+  bg.addColorStop(0.35, "#0a0030");
+  bg.addColorStop(0.7,  "#001540");
+  bg.addColorStop(1,    "#000a20");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
 
-  context.globalCompositeOperation = "destination-over";
-
-  const bgGradient = context.createLinearGradient(0, 0, 0, height);
-  bgGradient.addColorStop(0, "#000000");
-  bgGradient.addColorStop(0.45, "#FFD700");
-  bgGradient.addColorStop(1, "#007FFF");
-  context.fillStyle = bgGradient;
-  context.fillRect(0, 0, width, height);
-
-  const cabinetGlow = context.createRadialGradient(
-    width / 2,
-    height * 0.78,
-    20,
-    width / 2,
-    height * 0.78,
-    250,
-  );
-  cabinetGlow.addColorStop(0, "rgba(255, 215, 0, 0.22)");
-  cabinetGlow.addColorStop(0.4, "rgba(0, 127, 255, 0.12)");
-  cabinetGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
-  context.fillStyle = cabinetGlow;
-  context.fillRect(0, 0, width, height);
-
-  context.beginPath();
-  playfield.forEach(([x, y], index) => {
-    if (index === 0) {
-      context.moveTo(x, y);
-      return;
-    }
-    context.lineTo(x, y);
-  });
-  context.closePath();
-
-  const fieldGradient = context.createLinearGradient(0, 42, 0, 582);
-  fieldGradient.addColorStop(0, "#FF0000");
-  fieldGradient.addColorStop(0.4, "#FFD700");
-  fieldGradient.addColorStop(0.72, "#007FFF");
-  fieldGradient.addColorStop(1, "#C0C0C0");
-  context.fillStyle = fieldGradient;
-  context.fill();
-
-  context.lineWidth = 10;
-  context.strokeStyle = "#FF4500";
-  context.stroke();
-
-  context.lineWidth = 2;
-  context.strokeStyle = "rgba(0, 0, 0, 0.28)";
-  context.stroke();
-
-  const starColors = ["#FFD700", "#007FFF", "#FF0000"];
+  // Starfield
   const stars = [
-    [112, 88],
-    [145, 128],
-    [276, 112],
-    [302, 156],
-    [118, 212],
-    [285, 226],
+    [30,40,1.2,"#fff"],[55,90,0.8,"#adf"],[80,30,1,"#ffd"],
+    [130,55,0.9,"#fff"],[170,22,1.1,"#cff"],[210,70,0.7,"#fff"],
+    [250,38,1,"#ffd"],[290,80,0.8,"#adf"],[320,20,1.2,"#fff"],
+    [60,200,0.8,"#fff"],[100,160,0.7,"#cff"],[150,210,1,"#fff"],
+    [200,180,0.9,"#ffd"],[240,130,0.8,"#fff"],[280,200,1.1,"#adf"],
+    [40,350,0.7,"#fff"],[90,300,1,"#cff"],[190,340,0.8,"#fff"],
+    [240,310,0.9,"#ffd"],[290,360,0.7,"#fff"],
+    [50,460,1,"#fff"],[100,500,0.8,"#adf"],[150,450,0.7,"#cff"],
+    [200,490,1.1,"#fff"],[260,460,0.8,"#ffd"],
   ];
-  stars.forEach(([x, y], index) => {
-    context.fillStyle = starColors[index % starColors.length];
-    context.beginPath();
-    context.arc(x, y, 2.2, 0, Math.PI * 2);
-    context.fill();
-  });
+  stars.forEach(([x, y, r, c]) => star(ctx, x, y, r, c));
 
-  context.globalCompositeOperation = "source-over";
-
-  const orbitStroke = (color, points, widthValue = 5) => {
-    context.save();
-    context.strokeStyle = color;
-    context.lineWidth = widthValue;
-    context.shadowBlur = 16;
-    context.shadowColor = color;
-    context.beginPath();
-    points.forEach(([x, y], index) => {
-      if (index === 0) {
-        context.moveTo(x, y);
-        return;
-      }
-      context.lineTo(x, y);
-    });
-    context.stroke();
-    context.restore();
-  };
-  // TODO come back 
-  // orbitStroke("rgba(116, 242, 255, 0.95)", [
-  //   [94, 120],
-  //   [118, 90],
-  //   [170, 80],
-  //   [216, 116],
-  // ]);
-  // orbitStroke("rgba(255, 144, 71, 0.88)", [
-  //   [276, 86],
-  //   [316, 118],
-  //   [322, 182],
-  //   [298, 242],
-  // ]);
-  // orbitStroke("rgba(248, 72, 184, 0.82)", [
-  //   [100, 330],
-  //   [128, 274],
-  //   [176, 248],
-  //   [230, 276],
-  // ]);
-  // orbitStroke("rgba(128, 255, 160, 0.82)", [
-  //   [132, 438],
-  //   [166, 390],
-  //   [220, 368],
-  //   [278, 410],
-  // ]);
-
-  const insert = (x, y, r, color) => {
-    context.save();
-    context.fillStyle = color;
-    context.shadowBlur = 14;
-    context.shadowColor = color;
-    context.beginPath();
-    context.arc(x, y, r, 0, Math.PI * 2);
-    context.fill();
-    context.restore();
-  };
-
+  // Playfield polygon
+  ctx.beginPath();
   [
-    [138, 158, 4, "#f7d154"],
-    [176, 182, 4, "#74f2ff"],
-    [232, 154, 4, "#ff78d6"],
-    [284, 196, 4, "#f7d154"],
-    [150, 304, 5, "#74f2ff"],
-    [252, 324, 5, "#ff8e54"],
-    [126, 468, 4, "#ff78d6"],
-    [278, 474, 4, "#74f2ff"],
-  ].forEach(([x, y, r, color]) => insert(x, y, r, color));
+    [50, 30],[330, 30],[355, 110],[362, 260],
+    [345, 510],[298, 578],[102, 578],[55, 510],[38, 260],[50, 110],
+  ].forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+  ctx.closePath();
 
-  const glowBumper = (body, color) => {
-    context.save();
-    context.fillStyle = color;
-    context.globalAlpha = 0.22;
-    context.shadowBlur = 28;
-    context.shadowColor = color;
-    context.beginPath();
-    context.arc(body.position.x, body.position.y, 30, 0, Math.PI * 2);
-    context.fill();
-    context.restore();
-  };
+  const field = ctx.createLinearGradient(0, 30, 0, 578);
+  field.addColorStop(0,    "#0a0040");
+  field.addColorStop(0.3,  "#001060");
+  field.addColorStop(0.6,  "#001850");
+  field.addColorStop(1,    "#000c30");
+  ctx.fillStyle = field;
+  ctx.fill();
 
-  glowBumper(bumpers[0], "#ffd166");
-  glowBumper(bumpers[1], "#6ef6ff");
-  glowBumper(bumpers[2], "#ff66d8");
-  glowBumper(centerPost, "#ff9f5a");
-  glowBumper(leftLanePost, "#7cffc9");
-  glowBumper(rightLanePost, "#7cffc9");
+  // Outer border glow
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = "#0050ff";
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = "#0050ff";
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(100,180,255,0.5)";
+  ctx.stroke();
 
-  const coreGlow = context.createRadialGradient(
-    width / 2,
-    height - 95,
-    18,
-    width / 2,
-    height - 95,
-    86,
-  );
-  // coreGlow.addColorStop(0, "rgba(88, 226, 255, 0.95)");
-  // coreGlow.addColorStop(0.22, "rgba(88, 226, 255, 0.72)");
-  // coreGlow.addColorStop(0.5, "rgba(135, 79, 255, 0.35)");
-  // coreGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
-  context.fillStyle = coreGlow;
-  context.beginPath();
-  context.arc(width / 2, height - 95, 86, 0, Math.PI * 2);
-  context.fill();
+  ctx.globalCompositeOperation = "source-over";
 
-  context.save();
-  context.strokeStyle = "rgba(112, 245, 255, 0.65)";
-  context.lineWidth = 3;
-  context.shadowBlur = 18;
-  context.shadowColor = "#70f5ff";
-  context.beginPath();
-  context.moveTo(160, 548);
-  context.lineTo(184, 500);
-  context.lineTo(200, 540);
-  context.lineTo(216, 492);
-  context.lineTo(240, 548);
-  context.stroke();
-  context.restore();
+  // Planet / wormhole glow
+  glowCircle(ctx, wormholeBumper.position.x, wormholeBumper.position.y, 60, "#8800ff", 0.25);
+  glowCircle(ctx, wormholeBumper.position.x, wormholeBumper.position.y, 30, "#cc00ff", 0.4);
 
-  [leftSavePost, rightSavePost].forEach((post) => {
-    context.save();
-    context.fillStyle = "#ff4fd8";
-    context.shadowBlur = 12;
-    context.shadowColor = "#ff4fd8";
-    context.beginPath();
-    context.arc(post.position.x, post.position.y, 9, 0, Math.PI * 2);
-    context.fill();
-    context.restore();
+  // Bumper glows
+  const bumperColors = ["#ffcc00","#00ffcc","#ff4488","#00aaff"];
+  bumpers.forEach((b, i) => glowCircle(ctx, b.position.x, b.position.y, 34, bumperColors[i % 4], 0.3));
+
+  // Flag target indicators
+  [leftFlagTarget, rightFlagTarget].forEach((t, i) => {
+    const col = i === 0 ? "#00ffaa" : "#ff6600";
+    glowCircle(ctx, t.position.x, t.position.y, 22, col, 0.35);
+    ctx.save();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = col;
+    ctx.strokeRect(t.position.x - 10, t.position.y - 8, 20, 16);
+    ctx.restore();
   });
 
-  const chargeHeight = 132;
-  const chargeTop = height - 184;
-  const chargeLeft = width - 24;
-  drawRoundedRect(context, chargeLeft, chargeTop, 10, chargeHeight, 5);
-  context.fillStyle = "rgba(255, 255, 255, 0.12)";
-  context.fill();
-  // drawRoundedRect(
-  //   context,
-  //   chargeLeft,
-  //   chargeTop + chargeHeight * (1 - launchCharge),
-  //   10,
-  //   Math.max(10, chargeHeight * launchCharge),
-  //   5,
-  // );
-  context.fillStyle = "#ffb347";
-  context.shadowBlur = 12;
-  context.shadowColor = "#ffb347";
-  context.fill();
+  // Save post pips
+  [leftSavePost, rightSavePost].forEach(p => {
+    glowCircle(ctx, p.position.x, p.position.y, 18, "#ff0088", 0.4);
+  });
 
-  context.fillStyle = "rgba(222, 241, 255, 0.9)";
-  context.font = "11px monospace";
-  context.fillText("SPACE", width - 56, height - 28);
+  // Lane post pips
+  [leftLanePost, rightLanePost].forEach(p => {
+    glowCircle(ctx, p.position.x, p.position.y, 16, "#ffdd00", 0.35);
+  });
 
-  context.restore();
+  // Orbit arc decorations (top)
+  ctx.save();
+  ctx.strokeStyle = "rgba(0,200,255,0.25)";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath();
+  ctx.arc(200, 30, 120, 0, Math.PI);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // Grid lines (Space Cadet vibe)
+  ctx.save();
+  ctx.strokeStyle = "rgba(0, 80, 200, 0.07)";
+  ctx.lineWidth = 1;
+  for (let y = 60; y < H; y += 40) drawNeonLine(ctx, 40, y, W - 40, y, "rgba(0,80,200,0.06)", 0.5);
+  ctx.restore();
+
+  // Neon inlay: vertical center stripe
+  ctx.save();
+  ctx.strokeStyle = "rgba(0,200,255,0.1)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(W / 2, 60); ctx.lineTo(W / 2, H - 80);
+  ctx.stroke();
+  ctx.restore();
+
+  // Launch charge meter
+  const meterH = 120;
+  const meterX = W - 22;
+  const meterY = H - 170;
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,180,0,0.4)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(meterX, meterY, 10, meterH);
+  const fillH = meterH * launchCharge;
+  const grad = ctx.createLinearGradient(0, meterY + meterH - fillH, 0, meterY + meterH);
+  grad.addColorStop(0, "#ffdd00");
+  grad.addColorStop(1, "#ff6600");
+  ctx.fillStyle = grad;
+  ctx.fillRect(meterX + 1, meterY + meterH - fillH, 8, fillH);
+  ctx.fillStyle = "rgba(200,220,255,0.7)";
+  ctx.font = "9px monospace";
+  ctx.fillText("PWR", meterX - 4, meterY + meterH + 14);
+  ctx.restore();
+
+  // "SPACE CADET" title insert
+  ctx.save();
+  ctx.fillStyle = "rgba(0,200,255,0.18)";
+  ctx.font = "bold 11px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("SPACE  CADET", W / 2, H - 18);
+  ctx.textAlign = "start";
+  ctx.restore();
+
+  ctx.restore();
 }
 
+// ─── Engine ──────────────────────────────────────────────────────────────────
 export function createEngine(container, options = {}) {
-  const { Engine, Render, Runner, Bodies, World, Body, Constraint, Events } =
-    Matter;
+  const { Engine, Render, Runner, Bodies, Body, Constraint, World, Events } = Matter;
   const { onScoreChange = () => {}, scoreConfig = PIECE_SCORES } = options;
 
   const engine = Engine.create();
-  engine.gravity.y = 0.88;
+  engine.gravity.y = 0.85;
 
-  const gameWidth = 400;
-  const gameHeight = 600;
+  const W = 400, H = 600;
+  const ballRadius = 10;
+  const launchLaneWidth = 48;
+  const launchX = W - launchLaneWidth / 2 - 8;
+  const launchRestY = H - 80;
+
+  const tableColor  = "#0a0a2e";
+  const wallColor   = "#0d1b4b";
+  const guideColor  = "#1a3a7a";
+  const slingColor  = "#cc0055";
+  const accentColor = "#ff4488";
 
   const render = Render.create({
     element: container,
     engine,
-    options: {
-      width: gameWidth,
-      height: gameHeight,
-      wireframes: false,
-      background: "#070814",
-    },
+    options: { width: W, height: H, wireframes: false, background: "#00001a" },
   });
 
-  const width = gameWidth;
-  const height = gameHeight;
-  const ballRadius = 10;
-  const launchLaneWidth = 52;
-  const launchX = width - launchLaneWidth / 2 - 10;
-  const launchRestY = height - 84;
-  const maxLaunchCharge = 1;
-  const tableColor = "#14213d";
-  const guideColor = "#1f4068";
-  const accentColor = "#ef476f";
-
-  const ballStart = { x: launchX, y: launchRestY };
   let score = 0;
   const emitScore = () => onScoreChange(score);
-  const addScore = (pieceKey) => {
-    score += scoreConfig[pieceKey] ?? 0;
-    emitScore();
-  };
+  const addScore  = (key) => { score += scoreConfig[key] ?? 0; emitScore(); };
 
+  const ballStart = { x: launchX, y: launchRestY };
   const spawnBall = (ball) => {
     Body.setPosition(ball, ballStart);
     Body.setVelocity(ball, { x: 0, y: 0 });
@@ -312,345 +238,260 @@ export function createEngine(container, options = {}) {
     Body.setAngle(ball, 0);
   };
 
-  // Ball
+  // ── Ball ──────────────────────────────────────────────────────────────────
   const ball = Bodies.circle(ballStart.x, ballStart.y, ballRadius, {
-    restitution: 0.92,
+    restitution: 0.9,
     friction: 0.001,
-    frictionAir: 0.001,
+    frictionAir: 0.0012,
     label: "ball",
-    render: { fillStyle: "#00ffcc" },
+    render: { fillStyle: "#c0ffee" },
   });
 
-  // Flippers
-  const flipperLength = 80;
-  const flipperWidth = 15;
-  const flipperY = height - 60;
+  // ── Walls ─────────────────────────────────────────────────────────────────
+  const leftWall  = Bodies.rectangle(-8, H / 2, 20, H,      { isStatic: true, render: { fillStyle: wallColor } });
+  const rightWall = Bodies.rectangle(W + 8, H * 0.66, 20, H, { isStatic: true, render: { fillStyle: wallColor } });
+  const ceiling   = Bodies.rectangle(W / 2, -8, W, 20,      { isStatic: true, render: { fillStyle: wallColor } });
 
-  const leftFlipper = Bodies.rectangle(
-    width * 0.35,
-    flipperY,
-    flipperLength,
-    flipperWidth,
-    {
-      density: 0.002,
-      render: { fillStyle: "#ff006e" },
-    },
+  // ── Top-right curve (circles) ─────────────────────────────────────────────
+  const topCurve = [
+    [W - 8,  90, 14],[W - 11, 78, 14],[W - 16, 66, 15],[W - 24, 55, 15],
+    [W - 34, 46, 16],[W - 46, 38, 17],[W - 60, 31, 18],[W - 76, 26, 19],
+    [W - 94, 22, 20],[W - 113,19, 21],[W - 133,17, 22],
+  ].map(([x, y, r]) => Bodies.circle(x, y, r, { isStatic: true, render: { fillStyle: tableColor } }));
+
+  // ── Launch lane wall ──────────────────────────────────────────────────────
+  const launchLaneWall = Bodies.rectangle(
+    W - launchLaneWidth - 14, H * 0.66, 10, H * 0.92,
+    { isStatic: true, render: { fillStyle: guideColor } }
   );
 
-  const rightFlipper = Bodies.rectangle(
-    width * 0.65,
-    flipperY,
-    flipperLength,
-    flipperWidth,
-    {
-      density: 0.002,
-      render: { fillStyle: "#ff006e" },
-    },
-  );
+  // ── Plunger + stop ────────────────────────────────────────────────────────
+  const launcherStop = Bodies.rectangle(launchX, H - 42, 34, 12, {
+    isStatic: true, render: { fillStyle: "#ffaa00" }
+  });
+  const plunger = Bodies.rectangle(launchX, H - 16, 26, 52, {
+    isStatic: true, isSensor: true, label: "plunger",
+    render: { fillStyle: "#ff8800", opacity: 0.9 }
+  });
+
+  // ── Launch turn: redirects ball from chute into playfield ─────────────────
+  const launchTurn = Bodies.rectangle(W - 100, 178, 80, 12, {
+    isStatic: true, angle: -0.44, label: "guide",
+    render: { fillStyle: guideColor }
+  });
+
+  // ── Orbit guide: top-left diagonal (upper loop lane) ─────────────────────
+  const upperLeftOrbit = Bodies.rectangle(W * 0.19, 96, 130, 12, {
+    isStatic: true, angle: Math.PI / 4.4, label: "orbit",
+    render: { fillStyle: "#1a5099" }
+  });
+
+  // ── Upper right orbit (mirror, redirects back from right wall) ────────────
+  const upperRightOrbit = Bodies.rectangle(W * 0.68, 98, 110, 12, {
+    isStatic: true, angle: -Math.PI / 4.2, label: "orbit",
+    render: { fillStyle: "#1a5099" }
+  });
+
+  // ── Center top guide (roof of bumper cluster) ─────────────────────────────
+  const upperCenterGuide = Bodies.rectangle(W * 0.46, 134, 108, 12, {
+    isStatic: true, angle: -0.1, label: "guide",
+    render: { fillStyle: guideColor }
+  });
+  // TODO — this is a bit too low and flat, causing some ball hang-ups in the upper zone. Maybe raise it up to 120 and increase the angle slightly?
+  // ── Left-side ramp slope (funnels into bumper zone) ───────────────────────
+  const leftMidSlope = Bodies.rectangle(W * 0.18, H * 0.44, 130, 14, {
+    isStatic: true, angle: -Math.PI / 6.5, label: "guide",
+    render: { fillStyle: guideColor }
+  });
+
+  // ── Right-side ramp slope (symmetric) ────────────────────────────────────
+  const rightMidSlope = Bodies.rectangle(W * 0.68, H * 0.42, 110, 14, {
+    isStatic: true, angle: Math.PI / 5.5, label: "guide",
+    render: { fillStyle: guideColor }
+  });
+
+  // ── Center fan guide ──────────────────────────────────────────────────────
+  const centerFan = Bodies.rectangle(W * 0.47, H * 0.33, 100, 12, {
+    isStatic: true, angle: 0.2, label: "guide",
+    render: { fillStyle: guideColor }
+  });
+
+  // Slingshots raised to H*0.70 and shortened — clear gap below them to flippers
+  const leftSling = Bodies.rectangle(W * 0.20, H * 0.70, 72, 13, {
+    isStatic: true, angle: -0.55, label: "sling",
+    render: { fillStyle: slingColor }
+  });
+  const rightSling = Bodies.rectangle(W * 0.66, H * 0.70, 72, 13, {
+    isStatic: true, angle: 0.55, label: "sling",
+    render: { fillStyle: slingColor }
+  });
+
+  // ── Lower guides ──────────────────────────────────────────────────────────
+  // lowerCenterGuide removed — was blocking the center path to flippers
+  const lowerLeftGuide = Bodies.rectangle(W * 0.12, H - 26, 100, 18, {
+    isStatic: true, angle: -0.52,
+    render: { fillStyle: tableColor }
+  });
+  const lowerRightGuide = Bodies.rectangle(W * 0.76, H - 26, 100, 18, {
+    isStatic: true, angle: 0.52,
+    render: { fillStyle: tableColor }
+  });
+
+  // Inlane guides raised to H*0.80 with gentler angle — guides ball to flippers
+  const leftInlaneGuide = Bodies.rectangle(W * 0.22, H * 0.80, 60, 11, {
+    isStatic: true, angle: 0.72, label: "guide",
+    render: { fillStyle: guideColor }
+  });
+  const rightInlaneGuide = Bodies.rectangle(W * 0.63, H * 0.80, 60, 11, {
+    isStatic: true, angle: -0.72, label: "guide",
+    render: { fillStyle: guideColor }
+  });
+
+  // leftLoopReturn removed — was blocking mid-left ball path
+
+  // rightBumperDeflector removed — was cluttering mid-right zone
+
+  // leftFunnelWall / rightFunnelWall removed — were choking flipper approach
+
+  // ── Drain guide ───────────────────────────────────────────────────────────
+  const drainGuide = Bodies.rectangle(W * 0.44, H - 6, 136, 10, {
+    isStatic: true, render: { fillStyle: "#1a2c50" }
+  });
+
+  // Save posts raised slightly — H*0.82 gives a clear lane to the flippers
+  const leftSavePost = Bodies.circle(W * 0.20, H * 0.82, 10, {
+    isStatic: true, label: "savePost",
+    render: { fillStyle: accentColor, strokeStyle: "#ffaacc", lineWidth: 2 }
+  });
+  const rightSavePost = Bodies.circle(W * 0.69, H * 0.82, 10, {
+    isStatic: true, label: "savePost",
+    render: { fillStyle: accentColor, strokeStyle: "#ffaacc", lineWidth: 2 }
+  });
+
+  // ── Lane posts ────────────────────────────────────────────────────────────
+  // Lane posts moved up into the upper-mid zone — clear of flipper path
+  const leftLanePost = Bodies.circle(W * 0.17, H * 0.42, 13, {
+    isStatic: true, label: "lanePost", restitution: 1.15,
+    render: { fillStyle: "#ffcc00", strokeStyle: "#fff8aa", lineWidth: 2 }
+  });
+  const rightLanePost = Bodies.circle(W * 0.74, H * 0.40, 13, {
+    isStatic: true, label: "lanePost", restitution: 1.15,
+    render: { fillStyle: "#ffcc00", strokeStyle: "#fff8aa", lineWidth: 2 }
+  });
+
+  // midLeftPost / midRightPost removed — were sitting in the drop zone
+
+  // ── Bumpers: tight triangle cluster (upper zone) + one wide bumper ────────
+  const bumpers = [
+    // Top-left of cluster
+    Bodies.circle(W * 0.27, 172, 20, {
+      isStatic: true, label: "bumper", restitution: 1.22,
+      render: { fillStyle: "#ffcc00", strokeStyle: "#fff5aa", lineWidth: 3 }
+    }),
+    // Top-right of cluster
+    Bodies.circle(W * 0.50, 158, 18, {
+      isStatic: true, label: "bumper", restitution: 1.22,
+      render: { fillStyle: "#00ffcc", strokeStyle: "#aaffee", lineWidth: 3 }
+    }),
+    // Bottom of cluster
+    Bodies.circle(W * 0.36, 240, 20, {
+      isStatic: true, label: "bumper", restitution: 1.22,
+      render: { fillStyle: "#ff4488", strokeStyle: "#ffbbdd", lineWidth: 3 }
+    }),
+    // NEW: fourth bumper, right-of-center (Space Cadet had 4 bumpers)
+    Bodies.circle(W * 0.60, 218, 18, {
+      isStatic: true, label: "bumper", restitution: 1.22,
+      render: { fillStyle: "#44aaff", strokeStyle: "#aaddff", lineWidth: 3 }
+    }),
+  ];
+
+  // ── NEW: Wormhole bumper (center-field, large, high-value) ───────────────
+  const wormholeBumper = Bodies.circle(W * 0.46, H * 0.55, 24, {
+    isStatic: true, label: "wormhole", restitution: 1.3,
+    render: { fillStyle: "#6600cc", strokeStyle: "#dd88ff", lineWidth: 4 }
+  });
+
+  // ── NEW: Flag targets (small rectangular hit boxes, like Space Cadet) ─────
+  const leftFlagTarget = Bodies.rectangle(W * 0.15, H * 0.35, 18, 34, {
+    isStatic: true, label: "flagTarget",
+    render: { fillStyle: "#00cc66", strokeStyle: "#aaffcc", lineWidth: 2 }
+  });
+  const rightFlagTarget = Bodies.rectangle(W * 0.76, H * 0.32, 18, 34, {
+    isStatic: true, label: "flagTarget",
+    render: { fillStyle: "#ff6600", strokeStyle: "#ffcc88", lineWidth: 2 }
+  });
+
+  // ── Flippers ──────────────────────────────────────────────────────────────
+  const flipperLength = 82;
+  const flipperWidth  = 14;
+  const flipperY      = H - 58;
+
+  const leftFlipper = Bodies.rectangle(W * 0.345, flipperY, flipperLength, flipperWidth, {
+    density: 0.002, label: "flipper",
+    render: { fillStyle: "#ee0055" }
+  });
+  const rightFlipper = Bodies.rectangle(W * 0.655, flipperY, flipperLength, flipperWidth, {
+    density: 0.002, label: "flipper",
+    render: { fillStyle: "#ee0055" }
+  });
 
   const leftPivot = Constraint.create({
-    pointA: { x: width * 0.28, y: flipperY },
+    pointA: { x: W * 0.27, y: flipperY },
     bodyB: leftFlipper,
     pointB: { x: -flipperLength / 2, y: 0 },
     stiffness: 1,
   });
-
   const rightPivot = Constraint.create({
-    pointA: { x: width * 0.72, y: flipperY },
+    pointA: { x: W * 0.73, y: flipperY },
     bodyB: rightFlipper,
     pointB: { x: flipperLength / 2, y: 0 },
     stiffness: 1,
   });
 
-  const leftWall = Bodies.rectangle(0, height / 2, 20, height, {
-    isStatic: true,
-    render: { fillStyle: tableColor },
+  // ── Drain sensor ──────────────────────────────────────────────────────────
+  const drainSensor = Bodies.rectangle(W / 2, H + 36, W, 40, {
+    isStatic: true, isSensor: true, label: "drain",
+    render: { visible: false }
   });
 
-  const rightWall = Bodies.rectangle(width, height * 0.68, 20, height, {
-    isStatic: true,
-    render: { fillStyle: tableColor },
-  });
-
-  const rightCurveWall = [
-    [width - 9, 88, 15],
-    [width - 12, 78, 15],
-    [width - 17, 68, 16],
-    [width - 24, 59, 16],
-    [width - 33, 50, 17],
-    [width - 44, 42, 17],
-    [width - 57, 35, 18],
-    [width - 72, 29, 19],
-    [width - 89, 24, 20],
-    [width - 107, 20, 21],
-    [width - 126, 18, 22],
-  ].map(([x, y, radius]) =>
-    Bodies.circle(x, y, radius, {
-      isStatic: true,
-      render: { fillStyle: tableColor },
-    }),
-  );
-
-  const ceiling = Bodies.rectangle(width / 2, 0, width, 20, {
-    isStatic: true,
-    render: { fillStyle: tableColor },
-  });
-
-  const launchLaneWall = Bodies.rectangle(
-    width - launchLaneWidth - 16,
-    height * 0.68,
-    12,
-    height * 0.9,
-    {
-      isStatic: true,
-      render: { fillStyle: guideColor },
-    },
-  );
-
-  const launchGate = Bodies.rectangle(width - launchLaneWidth - 3, 108, 20, 12, {
-    isStatic: true,
-    angle: -0.65,
-    label: "orbit",
-    render: { fillStyle: guideColor },
-  });
-
-  // const launchGuide = Bodies.rectangle(width - 72, 146, 110, 12, {
-  //   isStatic: true,
-  //   angle: -1.12,
-  //   render: { fillStyle: guideColor },
-  // });
-
-  const launchTurn = Bodies.rectangle(width - 104, 184, 84, 12, {
-    isStatic: true,
-    angle: -0.42,
-    label: "guide",
-    render: { fillStyle: guideColor },
-  });
-
-  const launcherStop = Bodies.rectangle(launchX, height - 44, 36, 14, {
-    isStatic: true,
-    render: { fillStyle: "#fca311" },
-  });
-
-  const plunger = Bodies.rectangle(launchX, height - 18, 28, 56, {
-    isStatic: true,
-    isSensor: true,
-    label: "plunger",
-    render: { fillStyle: "#f77f00", opacity: 0.85 },
-  });
-
-  const upperLeftOrbit = Bodies.rectangle(width * 0.2, 102, 128, 12, {
-    isStatic: true,
-    angle: Math.PI / 4.6,
-    label: "orbit",
-    render: { fillStyle: guideColor },
-  });
-
-  const upperCenterGuide = Bodies.rectangle(width * 0.49, 118, 112, 12, {
-    isStatic: true,
-    angle: -0.12,
-    label: "guide",
-    render: { fillStyle: guideColor },
-  });
-
-  const upperRightOrbit = Bodies.rectangle(width * 0.7, 102, 112, 12, {
-    isStatic: true,
-    angle: -Math.PI / 4.2,
-    label: "orbit",
-    render: { fillStyle: guideColor },
-  });
-
-  const leftMidSlope = Bodies.rectangle(width * 0.24, height * 0.47, 138, 14, {
-    isStatic: true,
-    angle: -Math.PI / 7,
-    label: "guide",
-    render: { fillStyle: guideColor },
-  });
-
-  const rightMidSlope = Bodies.rectangle(width * 0.6, height * 0.42, 104, 14, {
-    isStatic: true,
-    angle: Math.PI / 5.2,
-    label: "guide",
-    render: { fillStyle: guideColor },
-  });
-
-  const centerFan = Bodies.rectangle(width * 0.48, height * 0.32, 96, 14, {
-    isStatic: true,
-    angle: 0.22,
-    label: "guide",
-    render: { fillStyle: guideColor },
-  });
-
-  const leftSling = Bodies.rectangle(width * 0.22, height * 0.77, 86, 14, {
-    isStatic: true,
-    angle: -0.58,
-    label: "sling",
-    render: { fillStyle: accentColor },
-  });
-
-  const rightSling = Bodies.rectangle(width * 0.66, height * 0.77, 86, 14, {
-    isStatic: true,
-    angle: 0.58,
-    label: "sling",
-    render: { fillStyle: accentColor },
-  });
-
-  const centerPost = Bodies.circle(width * 0.49, height * 0.53, 17, {
-    isStatic: true,
-    label: "bumper",
-    restitution: 1.18,
-    render: { fillStyle: "#f4a261", strokeStyle: "#ffe3c2", lineWidth: 3 },
-  });
-
-  const leftLanePost = Bodies.circle(width * 0.18, height * 0.64, 14, {
-    isStatic: true,
-    label: "lanePost",
-    restitution: 1.16,
-    render: { fillStyle: "#e9c46a", strokeStyle: "#fff1b2", lineWidth: 3 },
-  });
-
-  const rightLanePost = Bodies.circle(width * 0.72, height * 0.6, 14, {
-    isStatic: true,
-    label: "lanePost",
-    restitution: 1.16,
-    render: { fillStyle: "#e9c46a", strokeStyle: "#fff1b2", lineWidth: 3 },
-  });
-
-  const lowerCenterGuide = Bodies.rectangle(width * 0.48, height * 0.69, 108, 12, {
-    isStatic: true,
-    angle: -0.06,
-    label: "guide",
-    render: { fillStyle: guideColor },
-  });
-
-  const lowerLeftGuide = Bodies.rectangle(width * 0.13, height - 28, 98, 18, {
-    isStatic: true,
-    angle: -0.5,
-    render: { fillStyle: tableColor },
-  });
-
-  const lowerRightGuide = Bodies.rectangle(width * 0.77, height - 28, 98, 18, {
-    isStatic: true,
-    angle: 0.5,
-    render: { fillStyle: tableColor },
-  });
-
-  const leftInlaneGuide = Bodies.rectangle(width * 0.26, height * 0.86, 72, 12, {
-    isStatic: true,
-    angle: 0.9,
-    label: "guide",
-    render: { fillStyle: guideColor },
-  });
-
-  const rightInlaneGuide = Bodies.rectangle(width * 0.61, height * 0.86, 72, 12, {
-    isStatic: true,
-    angle: -0.9,
-    label: "guide",
-    render: { fillStyle: guideColor },
-  });
-
-  const leftSavePost = Bodies.circle(width * 0.2, height * 0.86, 10, {
-    isStatic: true,
-    label: "savePost",
-    render: { fillStyle: accentColor },
-  });
-
-  const rightSavePost = Bodies.circle(width * 0.7, height * 0.86, 10, {
-    isStatic: true,
-    label: "savePost",
-    render: { fillStyle: accentColor },
-  });
-
-  const drainGuide = Bodies.rectangle(width * 0.45, height - 8, 132, 12, {
-    isStatic: true,
-    angle: -0.02,
-    render: { fillStyle: "#264653" },
-  });
-
-  const bumpers = [
-    Bodies.circle(width * 0.28, 175, 22, {
-      isStatic: true,
-      label: "bumper",
-      restitution: 1.2,
-      render: { fillStyle: "#ffd166", strokeStyle: "#fff3b0", lineWidth: 3 },
-    }),
-    Bodies.circle(width * 0.52, 164, 20, {
-      isStatic: true,
-      label: "bumper",
-      restitution: 1.2,
-      render: { fillStyle: "#06d6a0", strokeStyle: "#b7ffef", lineWidth: 3 },
-    }),
-    Bodies.circle(width * 0.37, 258, 22, {
-      isStatic: true,
-      label: "bumper",
-      restitution: 1.2,
-      render: { fillStyle: "#118ab2", strokeStyle: "#c7f2ff", lineWidth: 3 },
-    }),
-  ];
-
-  const drainSensor = Bodies.rectangle(width / 2, height + 34, width, 40, {
-    isStatic: true,
-    isSensor: true,
-    label: "drain",
-    render: { visible: false },
-  });
-
+  // ── World assembly ────────────────────────────────────────────────────────
   World.add(engine.world, [
     ball,
-    leftWall,
-    rightWall,
-    ...rightCurveWall,
-    ceiling,
-    launchLaneWall,
-    // launchGate,
-    // launchGuide,
-    launchTurn,
-    launcherStop,
-    plunger,
-    upperLeftOrbit,
-    // upperCenterGuide,
-    // upperRightOrbit,
-    // leftMidSlope,
-    // rightMidSlope,
-    // centerFan,
-    // leftSling,
-    // rightSling,
-    centerPost,
-    leftLanePost,
-    rightLanePost,
-    lowerCenterGuide,
-    lowerLeftGuide,
-    lowerRightGuide,
-    leftInlaneGuide,
-    rightInlaneGuide,
-    leftSavePost,
-    rightSavePost,
-    drainGuide, // TODO make this a sensor only for the drain area
-    leftFlipper,
-    rightFlipper,
-    leftPivot,
-    rightPivot,
+    leftWall, rightWall, ceiling,
+    ...topCurve,
+    launchLaneWall, launcherStop, plunger,
+    // launchTurn,
+    upperLeftOrbit, upperRightOrbit, // upperCenterGuide,
+    leftMidSlope, rightMidSlope, // centerFan,
+
+    leftSling, rightSling,
+    leftLanePost, rightLanePost,
+    leftSavePost, rightSavePost,
+    lowerLeftGuide, lowerRightGuide,
+    // leftInlaneGuide, rightInlaneGuide, // above flippers
+    wormholeBumper,
+    leftFlagTarget, rightFlagTarget,
+    drainGuide,
+    leftFlipper, rightFlipper,
+    leftPivot, rightPivot,
     drainSensor,
     ...bumpers,
   ]);
 
-  // Controls
-  let leftActive = false;
-  let rightActive = false;
+  // ── Controls ──────────────────────────────────────────────────────────────
+  let leftActive    = false;
+  let rightActive   = false;
   let launchCharging = false;
-  let launchCharge = 0;
+  let launchCharge  = 0;
   let pendingLaunch = false;
+
   const scoreableLabels = new Set(Object.keys(scoreConfig));
 
   const ballIsInLaunchLane = () =>
-    ball.position.x > width - launchLaneWidth - 24 && ball.position.y > height * 0.55;
+    ball.position.x > W - launchLaneWidth - 22 && ball.position.y > H * 0.55;
 
   const resetBall = ({ resetScore = false } = {}) => {
-    if (resetScore) {
-      score = 0;
-      emitScore();
-    }
-
+    if (resetScore) { score = 0; emitScore(); }
     launchCharge = 0;
     launchCharging = false;
     pendingLaunch = false;
@@ -664,161 +505,125 @@ export function createEngine(container, options = {}) {
   };
 
   const handleKeyDown = (e) => {
-    if (e.code === "ArrowLeft") {
-      e.preventDefault();
-      leftActive = true;
-    }
-
-    if (e.code === "ArrowRight") {
-      e.preventDefault();
-      rightActive = true;
-    }
-
+    if (e.code === "ArrowLeft")  { e.preventDefault(); leftActive = true; }
+    if (e.code === "ArrowRight") { e.preventDefault(); rightActive = true; }
     if (e.code === "Space") {
       e.preventDefault();
-      if (ballIsInLaunchLane()) {
-        launchCharging = true;
-      }
+      if (ballIsInLaunchLane()) launchCharging = true;
     }
   };
 
   const handleKeyUp = (e) => {
-    if (e.code === "ArrowLeft") {
-      e.preventDefault();
-      leftActive = false;
-    }
-
-    if (e.code === "ArrowRight") {
-      e.preventDefault();
-      rightActive = false;
-    }
-
+    if (e.code === "ArrowLeft")  { e.preventDefault(); leftActive = false; }
+    if (e.code === "ArrowRight") { e.preventDefault(); rightActive = false; }
     if (e.code === "Space") {
       e.preventDefault();
-      if (launchCharging && ballIsInLaunchLane()) {
-        pendingLaunch = true;
-      }
-
+      if (launchCharging && ballIsInLaunchLane()) pendingLaunch = true;
       launchCharging = false;
     }
-
-    if (e.code === "KeyR") {
-      e.preventDefault();
-      resetBall({ resetScore: true });
-    }
+    if (e.code === "KeyR") { e.preventDefault(); resetBall({ resetScore: true }); }
   };
 
   window.addEventListener("keydown", handleKeyDown);
   window.addEventListener("keyup", handleKeyUp);
 
-  Body.setAngle(leftFlipper, -0.3);
-  Body.setAngle(rightFlipper, 0.3);
+  Body.setAngle(leftFlipper,  -0.3);
+  Body.setAngle(rightFlipper,  0.3);
 
+  // ── Collision events ──────────────────────────────────────────────────────
   Events.on(engine, "collisionStart", ({ pairs }) => {
     pairs.forEach(({ bodyA, bodyB }) => {
       const labels = [bodyA.label, bodyB.label];
 
       if (labels.includes("drain") && labels.includes("ball")) {
         resetBall();
+        return;
       }
 
-      const scoringBody =
-        bodyA.label === "ball"
-          ? bodyB
-          : bodyB.label === "ball"
-            ? bodyA
-            : null;
-
+      const scoringBody = bodyA.label === "ball" ? bodyB
+                        : bodyB.label === "ball" ? bodyA : null;
       if (scoringBody && scoreableLabels.has(scoringBody.label)) {
         addScore(scoringBody.label);
       }
 
+      // Bumper kick
       if (labels.includes("bumper") && labels.includes("ball")) {
         const bumper = bodyA.label === "bumper" ? bodyA : bodyB;
         const dx = ball.position.x - bumper.position.x;
         const dy = ball.position.y - bumper.position.y;
-        const length = Math.max(Math.hypot(dx, dy), 1);
-        const boost = 0.03;
+        const len = Math.max(Math.hypot(dx, dy), 1);
+        Body.applyForce(ball, ball.position, { x: (dx / len) * 0.032, y: (dy / len) * 0.032 });
+      }
 
-        Body.applyForce(ball, ball.position, {
-          x: (dx / length) * boost,
-          y: (dy / length) * boost,
+      // Wormhole kick (stronger, random-ish exit angle)
+      if (labels.includes("wormhole") && labels.includes("ball")) {
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
+        Body.setVelocity(ball, {
+          x: Math.cos(angle) * 12,
+          y: Math.sin(angle) * 12,
         });
+      }
+
+      // Sling kick
+      if (labels.includes("sling") && labels.includes("ball")) {
+        const sling = bodyA.label === "sling" ? bodyA : bodyB;
+        const dx = ball.position.x - sling.position.x;
+        const dy = ball.position.y - sling.position.y;
+        const len = Math.max(Math.hypot(dx, dy), 1);
+        Body.applyForce(ball, ball.position, { x: (dx / len) * 0.025, y: (dy / len) * 0.025 });
       }
     });
   });
+
   emitScore();
 
+  // ── Per-frame update ──────────────────────────────────────────────────────
   Events.on(engine, "beforeUpdate", () => {
+    // Charge / decay
     if (launchCharging && ballIsInLaunchLane()) {
-      launchCharge = Math.min(maxLaunchCharge, launchCharge + 0.02);
+      launchCharge = Math.min(1, launchCharge + 0.018);
     } else if (!launchCharging) {
       launchCharge = Math.max(0, launchCharge - 0.04);
     }
 
-    Body.setPosition(plunger, {
-      x: launchX,
-      y: height - 18 + launchCharge * 26,
-    });
+    Body.setPosition(plunger, { x: launchX, y: H - 16 + launchCharge * 28 });
 
     if (pendingLaunch && ballIsInLaunchLane()) {
       Body.setVelocity(ball, {
-        x: -3.2 - launchCharge * 3.4,
-        y: -11 - launchCharge * 13,
+        x: -3.0 - launchCharge * 3.2,
+        y: -10  - launchCharge * 14,
       });
-
       pendingLaunch = false;
-      launchCharge = 0;
+      launchCharge  = 0;
     }
 
-    // Left flipper limits
-    const leftMin = -0.8;
-    const leftMax = -0.2;
-
+    // Left flipper
     if (leftActive) {
-      if (leftFlipper.angle > leftMin) {
-        Body.setAngularVelocity(leftFlipper, -0.4);
-      } else {
-        Body.setAngularVelocity(leftFlipper, 0);
-      }
+      if (leftFlipper.angle > -0.82) Body.setAngularVelocity(leftFlipper, -0.42);
+      else Body.setAngularVelocity(leftFlipper, 0);
     } else {
-      if (leftFlipper.angle < leftMax) {
-        Body.setAngularVelocity(leftFlipper, 0.2);
-      } else {
-        Body.setAngularVelocity(leftFlipper, 0);
-        Body.setAngle(leftFlipper, leftMax); // snap to rest
-      }
+      if (leftFlipper.angle < -0.2) Body.setAngularVelocity(leftFlipper, 0.22);
+      else { Body.setAngularVelocity(leftFlipper, 0); Body.setAngle(leftFlipper, -0.2); }
     }
 
-    // Right flipper limits
-    const rightMin = 0.2;
-    const rightMax = 0.8;
-
+    // Right flipper
     if (rightActive) {
-      if (rightFlipper.angle < rightMax) {
-        Body.setAngularVelocity(rightFlipper, 0.4);
-      } else {
-        Body.setAngularVelocity(rightFlipper, 0);
-      }
+      if (rightFlipper.angle < 0.82) Body.setAngularVelocity(rightFlipper, 0.42);
+      else Body.setAngularVelocity(rightFlipper, 0);
     } else {
-      if (rightFlipper.angle > rightMin) {
-        Body.setAngularVelocity(rightFlipper, -0.2);
-      } else {
-        Body.setAngularVelocity(rightFlipper, 0);
-        Body.setAngle(rightFlipper, rightMin); // snap to rest
-      }
+      if (rightFlipper.angle > 0.2) Body.setAngularVelocity(rightFlipper, -0.22);
+      else { Body.setAngularVelocity(rightFlipper, 0); Body.setAngle(rightFlipper, 0.2); }
     }
   });
 
+  // ── Render hook: canvas art ───────────────────────────────────────────────
   Events.on(render, "afterRender", () => {
-    const { context } = render;
-    drawPlayfieldArt(context, width, height, launchCharge, {
+    drawPlayfieldArt(render.context, W, H, launchCharge, {
       bumpers,
-      centerPost,
-      leftLanePost,
-      rightLanePost,
-      leftSavePost,
-      rightSavePost,
+      wormholeBumper,
+      leftFlagTarget, rightFlagTarget,
+      leftSavePost, rightSavePost,
+      leftLanePost, rightLanePost,
     });
   });
 
@@ -827,18 +632,12 @@ export function createEngine(container, options = {}) {
   Runner.run(runner, engine);
 
   return {
-    engine,
-    render,
-    runner,
-    getScore() {
-      return score;
-    },
-    restart() {
-      resetBall({ resetScore: true });
-    },
-    destroy() {
+    engine, render, runner,
+    getScore() { return score; },
+    restart()  { resetBall({ resetScore: true }); },
+    destroy()  {
       window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("keyup",   handleKeyUp);
       Render.stop(render);
       Runner.stop(runner);
       World.clear(engine.world, false);
