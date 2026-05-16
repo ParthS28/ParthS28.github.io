@@ -1,16 +1,31 @@
-# React + Vite
+# GitHub Pages Deployment
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This app is set up to deploy to GitHub Pages as a personal site at `https://<username>.github.io/`.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- The repository name must be exactly `<username>.github.io`.
+- The default branch should be `main`.
+- In GitHub, go to `Settings -> Pages` and set:
+  - `Source`: `GitHub Actions`
 
-## React Compiler
+## Deploy flow
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Once the repo is pushed to GitHub, every push to `main` will:
 
-## Expanding the ESLint configuration
+1. Install dependencies
+2. Run `npm run build`
+3. Deploy the `dist/` output to GitHub Pages
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Local commands
+
+```bash
+npm install
+npm run dev
+npm run build
+```
+
+## Notes
+
+- This project uses Vite and currently targets the root domain, so no subpath/base-path changes are needed for a `username.github.io` deployment.
+- If you later deploy this same app to a project site like `https://github.com/<username>/<repo>`, you will need to add a Vite `base` path for that repository name.
