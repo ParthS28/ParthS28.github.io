@@ -1,8 +1,28 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import timelineData from "../data/timeline.json";
 
 export default function Timeline() {
+  const [scrollY, setScrollY] = useState(0);
   const { title, description, entries } = timelineData;
+
+  useEffect(() => {
+    let frame = null;
+    const handleScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        setScrollY(window.scrollY || window.pageYOffset);
+        frame = null;
+      });
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
 
   return (
     <section className="bg-transparent text-[var(--text)] py-20 px-4 sm:px-6">
@@ -28,6 +48,16 @@ export default function Timeline() {
             {entries.map((entry, index) => {
               const isLeft = index % 2 === 0;
 
+              const entryBase = (scrollY - index * 140) * 0.015;
+              const textShift = Math.max(
+                -22,
+                Math.min(22, entryBase * (isLeft ? -1 : 1))
+              );
+              const iconShift = Math.max(
+                -18,
+                Math.min(18, entryBase * (isLeft ? 1 : -1))
+              );
+
               return (
                 <div
                   key={entry.id}
@@ -38,8 +68,9 @@ export default function Timeline() {
                     className={`w-1/2 ${
                       isLeft ? "pr-20 sm:pr-24 md:pr-32 text-right" : "invisible"
                     }`}
+                    style={{ transform: `translateY(${textShift}px)` }}
                   >
-                    <div className="max-w-[260px] ml-auto">
+                    <div className="max-w-[420px] ml-auto">
                       <h3 className="text-2xl font-bold leading-snug text-[var(--color7)]">
                         {entry.period}
                       </h3>
@@ -55,7 +86,10 @@ export default function Timeline() {
                   </div>
 
                   {/* CENTER ICON */}
-                  <div className="mt-2 w-24 h-24 shrink-0 rounded-full border-4 border-[var(--color7)] bg-[var(--bg)] flex items-center justify-center overflow-hidden p-4 shadow-[var(--shadow)]">
+                  <div
+                    className="mt-2 w-24 h-24 shrink-0 rounded-full border-4 border-[var(--color7)] bg-[var(--bg)] flex items-center justify-center overflow-hidden p-4 shadow-[var(--shadow)]"
+                    style={{ transform: `translateY(${iconShift}px)` }}
+                  >
                     <img
                       src={entry.images[0].src}
                       alt={entry.images[0].alt}
@@ -68,8 +102,9 @@ export default function Timeline() {
                     className={`w-1/2 ${
                       !isLeft ? "pl-20 sm:pl-24 md:pl-32 text-left" : "invisible"
                     }`}
+                    style={{ transform: `translateY(${textShift}px)` }}
                   >
-                    <div className="max-w-[260px]">
+                    <div className="max-w-[420px]">
                       <h3 className="text-2xl font-bold leading-snug text-[var(--color7)]">
                         {entry.period}
                       </h3>

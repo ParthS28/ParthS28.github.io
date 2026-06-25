@@ -210,7 +210,8 @@ export function createEngine(container, options = {}) {
 
   const W = 400, H = 600;
   const ballRadius = 10;
-  const launchLaneWidth = 48;
+  const launchLaneWidth = 18;
+  const playfieldShift = -14; // offset to center playfield accounting for launcher
   const launchX = W - launchLaneWidth / 2 - 8;
   const launchRestY = H - 80;
 
@@ -261,7 +262,7 @@ export function createEngine(container, options = {}) {
 
   // ── Launch lane wall ──────────────────────────────────────────────────────
   const launchLaneWall = Bodies.rectangle(
-    W - launchLaneWidth - 14, H * 0.66, 10, H * 0.92,
+    W - launchLaneWidth - 14 + playfieldShift, H * 0.66, 10, H * 0.92,
     { isStatic: true, render: { fillStyle: guideColor } }
   );
 
@@ -275,74 +276,74 @@ export function createEngine(container, options = {}) {
   });
 
   // ── Launch turn: redirects ball from chute into playfield ─────────────────
-  const launchTurn = Bodies.rectangle(W - 100, 178, 80, 12, {
+  const launchTurn = Bodies.rectangle(W - 100 + playfieldShift, 178, 80, 12, {
     isStatic: true, angle: -0.44, label: "guide",
     render: { fillStyle: guideColor }
   });
 
   // ── Orbit guide: top-left diagonal (upper loop lane) ─────────────────────
-  const upperLeftOrbit = Bodies.rectangle(W * 0.19, 96, 130, 12, {
+  const upperLeftOrbit = Bodies.rectangle(W * 0.19 + playfieldShift, 96, 130, 12, {
     isStatic: true, angle: Math.PI / 4.4, label: "orbit",
     render: { fillStyle: "#1a5099" }
   });
 
   // ── Upper right orbit (mirror, redirects back from right wall) ────────────
-  const upperRightOrbit = Bodies.rectangle(W * 0.68, 98, 110, 12, {
+  const upperRightOrbit = Bodies.rectangle(W * 0.68 + playfieldShift, 98, 110, 12, {
     isStatic: true, angle: -Math.PI / 4.2, label: "orbit",
     render: { fillStyle: "#1a5099" }
   });
 
   // ── Center top guide (roof of bumper cluster) ─────────────────────────────
-  const upperCenterGuide = Bodies.rectangle(W * 0.46, 134, 108, 12, {
+  const upperCenterGuide = Bodies.rectangle(W * 0.46 + playfieldShift, 134, 108, 12, {
     isStatic: true, angle: -0.1, label: "guide",
     render: { fillStyle: guideColor }
   });
   // TODO — this is a bit too low and flat, causing some ball hang-ups in the upper zone. Maybe raise it up to 120 and increase the angle slightly?
   // ── Left-side ramp slope (funnels into bumper zone) ───────────────────────
-  const leftMidSlope = Bodies.rectangle(W * 0.18, H * 0.44, 130, 14, {
+  const leftMidSlope = Bodies.rectangle(W * 0.18 + playfieldShift, H * 0.44, 130, 14, {
     isStatic: true, angle: -Math.PI / 6.5, label: "guide",
     render: { fillStyle: guideColor }
   });
 
   // ── Right-side ramp slope (symmetric) ────────────────────────────────────
-  const rightMidSlope = Bodies.rectangle(W * 0.68, H * 0.42, 110, 14, {
+  const rightMidSlope = Bodies.rectangle(W * 0.68 + playfieldShift, H * 0.42, 110, 14, {
     isStatic: true, angle: Math.PI / 5.5, label: "guide",
     render: { fillStyle: guideColor }
   });
 
   // ── Center fan guide ──────────────────────────────────────────────────────
-  const centerFan = Bodies.rectangle(W * 0.47, H * 0.33, 100, 12, {
+  const centerFan = Bodies.rectangle(W * 0.47 + playfieldShift, H * 0.33, 100, 12, {
     isStatic: true, angle: 0.2, label: "guide",
     render: { fillStyle: guideColor }
   });
 
   // Slingshots raised to H*0.70 and shortened — clear gap below them to flippers
-  const leftSling = Bodies.rectangle(W * 0.20, H * 0.70, 72, 13, {
+  const leftSling = Bodies.rectangle(W * 0.20 + playfieldShift, H * 0.70, 72, 13, {
     isStatic: true, angle: -0.55, label: "sling",
     render: { fillStyle: slingColor }
   });
-  const rightSling = Bodies.rectangle(W * 0.66, H * 0.70, 72, 13, {
+  const rightSling = Bodies.rectangle(W * 0.66 + playfieldShift, H * 0.70, 72, 13, {
     isStatic: true, angle: 0.55, label: "sling",
     render: { fillStyle: slingColor }
   });
 
   // ── Lower guides ──────────────────────────────────────────────────────────
-  // lowerCenterGuide removed — was blocking the center path to flippers
-  const lowerLeftGuide = Bodies.rectangle(W * 0.12, H - 26, 100, 18, {
+  // Positioned near drain to avoid flipper interference
+  const lowerLeftGuide = Bodies.rectangle(W * 0.12 + playfieldShift, H - 10, 100, 18, {
     isStatic: true, angle: -0.52,
     render: { fillStyle: tableColor }
   });
-  const lowerRightGuide = Bodies.rectangle(W * 0.76, H - 26, 100, 18, {
+  const lowerRightGuide = Bodies.rectangle(W * 0.76 + playfieldShift, H - 10, 100, 18, {
     isStatic: true, angle: 0.52,
     render: { fillStyle: tableColor }
   });
 
   // Inlane guides raised to H*0.80 with gentler angle — guides ball to flippers
-  const leftInlaneGuide = Bodies.rectangle(W * 0.22, H * 0.80, 60, 11, {
+  const leftInlaneGuide = Bodies.rectangle(W * 0.22 + playfieldShift, H * 0.80, 60, 11, {
     isStatic: true, angle: 0.72, label: "guide",
     render: { fillStyle: guideColor }
   });
-  const rightInlaneGuide = Bodies.rectangle(W * 0.63, H * 0.80, 60, 11, {
+  const rightInlaneGuide = Bodies.rectangle(W * 0.63 + playfieldShift, H * 0.80, 60, 11, {
     isStatic: true, angle: -0.72, label: "guide",
     render: { fillStyle: guideColor }
   });
@@ -354,27 +355,27 @@ export function createEngine(container, options = {}) {
   // leftFunnelWall / rightFunnelWall removed — were choking flipper approach
 
   // ── Drain guide ───────────────────────────────────────────────────────────
-  const drainGuide = Bodies.rectangle(W * 0.44, H - 6, 136, 10, {
+  const drainGuide = Bodies.rectangle(W * 0.44 + playfieldShift, H - 6, 136, 10, {
     isStatic: true, render: { fillStyle: "#1a2c50" }
   });
 
   // Save posts raised slightly — H*0.82 gives a clear lane to the flippers
-  const leftSavePost = Bodies.circle(W * 0.20, H * 0.82, 10, {
+  const leftSavePost = Bodies.circle(W * 0.20 + playfieldShift, H * 0.82, 10, {
     isStatic: true, label: "savePost",
     render: { fillStyle: accentColor, strokeStyle: "#ffaacc", lineWidth: 2 }
   });
-  const rightSavePost = Bodies.circle(W * 0.69, H * 0.82, 10, {
+  const rightSavePost = Bodies.circle(W * 0.69 + playfieldShift, H * 0.82, 10, {
     isStatic: true, label: "savePost",
     render: { fillStyle: accentColor, strokeStyle: "#ffaacc", lineWidth: 2 }
   });
 
   // ── Lane posts ────────────────────────────────────────────────────────────
   // Lane posts moved up into the upper-mid zone — clear of flipper path
-  const leftLanePost = Bodies.circle(W * 0.17, H * 0.42, 13, {
+  const leftLanePost = Bodies.circle(W * 0.17 + playfieldShift, H * 0.42, 13, {
     isStatic: true, label: "lanePost", restitution: 1.15,
     render: { fillStyle: "#ffcc00", strokeStyle: "#fff8aa", lineWidth: 2 }
   });
-  const rightLanePost = Bodies.circle(W * 0.74, H * 0.40, 13, {
+  const rightLanePost = Bodies.circle(W * 0.74 + playfieldShift, H * 0.40, 13, {
     isStatic: true, label: "lanePost", restitution: 1.15,
     render: { fillStyle: "#ffcc00", strokeStyle: "#fff8aa", lineWidth: 2 }
   });
@@ -384,21 +385,21 @@ export function createEngine(container, options = {}) {
   // ── Bumpers: tight triangle cluster (upper zone) + one wide bumper ────────
   const bumpers = [
     // Top-left of cluster
-    Bodies.circle(W * 0.27, 172, 20, {
+    Bodies.circle(W * 0.27 + playfieldShift, 172, 20, {
       isStatic: true, label: "bumper", restitution: 1.22,
       render: { fillStyle: "#ffcc00", strokeStyle: "#fff5aa", lineWidth: 3 }
     }),
     // Top-right of cluster
-    Bodies.circle(W * 0.50, 158, 18, {
+    Bodies.circle(W * 0.50 + playfieldShift, 158, 18, {
       isStatic: true, label: "bumper", restitution: 1.22,
       render: { fillStyle: "#00ffcc", strokeStyle: "#aaffee", lineWidth: 3 }
     }),
     // Bottom of cluster
-    Bodies.circle(W * 0.36, 240, 20, {
+    Bodies.circle(W * 0.36 + playfieldShift, 240, 20, {
       isStatic: true, label: "bumper", restitution: 1.22,
       render: { fillStyle: "#ff4488", strokeStyle: "#ffbbdd", lineWidth: 3 }
     }),
-    // NEW: fourth bumper, right-of-center (Space Cadet had 4 bumpers)
+    // NEW: fourth bumper, right-of-center
     Bodies.circle(W * 0.60, 218, 18, {
       isStatic: true, label: "bumper", restitution: 1.22,
       render: { fillStyle: "#44aaff", strokeStyle: "#aaddff", lineWidth: 3 }
@@ -406,17 +407,17 @@ export function createEngine(container, options = {}) {
   ];
 
   // ── NEW: Wormhole bumper (center-field, large, high-value) ───────────────
-  const wormholeBumper = Bodies.circle(W * 0.46, H * 0.55, 24, {
+  const wormholeBumper = Bodies.circle(W * 0.46 + playfieldShift, H * 0.55, 24, {
     isStatic: true, label: "wormhole", restitution: 1.3,
     render: { fillStyle: "#6600cc", strokeStyle: "#dd88ff", lineWidth: 4 }
   });
 
   // ── NEW: Flag targets (small rectangular hit boxes, like Space Cadet) ─────
-  const leftFlagTarget = Bodies.rectangle(W * 0.15, H * 0.35, 18, 34, {
+  const leftFlagTarget = Bodies.rectangle(W * 0.15 + playfieldShift, H * 0.35, 18, 34, {
     isStatic: true, label: "flagTarget",
     render: { fillStyle: "#00cc66", strokeStyle: "#aaffcc", lineWidth: 2 }
   });
-  const rightFlagTarget = Bodies.rectangle(W * 0.76, H * 0.32, 18, 34, {
+  const rightFlagTarget = Bodies.rectangle(W * 0.76 + playfieldShift, H * 0.32, 18, 34, {
     isStatic: true, label: "flagTarget",
     render: { fillStyle: "#ff6600", strokeStyle: "#ffcc88", lineWidth: 2 }
   });
@@ -425,30 +426,32 @@ export function createEngine(container, options = {}) {
   const flipperLength = 82;
   const flipperWidth  = 14;
   const flipperY      = H - 58;
-  const leftFlipper = Bodies.rectangle(W * 0.345, flipperY, flipperLength, flipperWidth, {
+  const leftFlipper = Bodies.rectangle(W * 0.345 + playfieldShift, flipperY, flipperLength, flipperWidth, {
     density: 0.002, label: "flipper",
+    chamfer: { radius: 6 },
     render: { fillStyle: "#ee0055" }
   });
-  const rightFlipper = Bodies.rectangle(W * 0.655, flipperY, flipperLength, flipperWidth, {
+  const rightFlipper = Bodies.rectangle(W * 0.655 + playfieldShift, flipperY, flipperLength, flipperWidth, {
     density: 0.002, label: "flipper",
+    chamfer: { radius: 6 },
     render: { fillStyle: "#ee0055" }
   });
 
   const leftPivot = Constraint.create({
-    pointA: { x: W * 0.27, y: flipperY },
+    pointA: { x: W * 0.27 + playfieldShift, y: flipperY },
     bodyB: leftFlipper,
     pointB: { x: -flipperLength / 2, y: 0 },
     stiffness: 1,
   });
   const rightPivot = Constraint.create({
-    pointA: { x: W * 0.73, y: flipperY },
+    pointA: { x: W * 0.73 + playfieldShift, y: flipperY },
     bodyB: rightFlipper,
     pointB: { x: flipperLength / 2, y: 0 },
     stiffness: 1,
   });
 
   // ── Drain sensor ──────────────────────────────────────────────────────────
-  const drainSensor = Bodies.rectangle(W / 2, H + 36, W, 40, {
+  const drainSensor = Bodies.rectangle(W / 2 + playfieldShift, H + 36, W, 40, {
     isStatic: true, isSensor: true, label: "drain",
     render: { visible: false }
   });
@@ -461,7 +464,7 @@ export function createEngine(container, options = {}) {
     launchLaneWall, launcherStop, plunger,
     // launchTurn,
     upperLeftOrbit, upperRightOrbit, // upperCenterGuide,
-    leftMidSlope, rightMidSlope, // centerFan,
+    // leftMidSlope, rightMidSlope, // centerFan,
 
     leftSling, rightSling,
     leftLanePost, rightLanePost,

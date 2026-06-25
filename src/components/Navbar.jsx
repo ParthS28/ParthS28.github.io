@@ -15,7 +15,7 @@ function Navbar() {
         {/* Logo / Name */}
         <div className="min-w-0 text-left">
           <div className="truncate text-sm font-medium uppercase tracking-[0.28em] text-[var(--border)] sm:text-base">
-            Parth Shukla
+            PS
           </div>
         </div>
 
