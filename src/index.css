@@ -26,6 +26,7 @@
   --color4: #FF0000;
   --color5: #C0C0C0;
   --color6: #FF4500;
+  --color7: #FFFFFF;
   --text: var(--color5);
   --text-h: var(--color1);
   --bg: var(--color2);
@@ -60,7 +61,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color1: #000000;
+    --color1: #0b1937;
     --color2: #FFD700;
     --color3: #007FFF;
     --color4: #FF0000;
