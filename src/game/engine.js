@@ -425,7 +425,6 @@ export function createEngine(container, options = {}) {
   const flipperLength = 82;
   const flipperWidth  = 14;
   const flipperY      = H - 58;
-
   const leftFlipper = Bodies.rectangle(W * 0.345, flipperY, flipperLength, flipperWidth, {
     density: 0.002, label: "flipper",
     render: { fillStyle: "#ee0055" }

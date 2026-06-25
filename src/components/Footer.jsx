@@ -7,13 +7,13 @@ export default function Footer() {
         <br/><br/>
       
       {/* Social Links */}
-      <div className="flex flex-row gap-8 mb-3">
+      <div className="flex flex-row gap-12 mb-3">
         
         <a
           href="https://github.com/ParthS28"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 text-sm uppercase tracking-wider transition-colors text-[var(--text)] hover:text-[var(--accent)]"
+          className="flex items-center justify-center p-1 text-sm uppercase tracking-wider transition-colors text-[var(--text)] hover:text-[var(--accent)]"
         >
           <FaGithub className="text-lg" />
           
@@ -23,7 +23,7 @@ export default function Footer() {
           href="https://linkedin.com/in/parthsh"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 text-sm uppercase tracking-wider transition-colors text-[var(--text)] hover:text-[var(--accent)]"
+          className="flex items-center justify-center p-1 text-sm uppercase tracking-wider transition-colors text-[var(--text)] hover:text-[var(--accent)]"
         >
           <FaLinkedin className="text-lg" />
           
@@ -31,7 +31,7 @@ export default function Footer() {
 
         <a
           href="mailto:parthshukla285@gmail.com"
-          className="flex items-center gap-2 text-sm uppercase tracking-wider transition-colors text-[var(--text)] hover:text-[var(--accent)]"
+          className="flex items-center justify-center p-1 text-sm uppercase tracking-wider transition-colors text-[var(--text)] hover:text-[var(--accent)]"
         >
           <FaEnvelope className="text-lg" />
           
