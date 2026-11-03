@@ -12,191 +12,179 @@ export const PIECE_SCORES = {
   wormhole:   300,
 };
 
-// ─── Canvas art helpers ──────────────────────────────────────────────────────
-function star(ctx, cx, cy, r, color) {
+// ─── Pixel sprite renderer ───────────────────────────────────────────────────
+const spriteCache = new Map();
+const ASSET = "/assets/game/";
+function loadSprite(path) {
+  if (!spriteCache.has(path)) {
+    const image = new Image();
+    image.src = `${ASSET}${path}`;
+    spriteCache.set(path, image);
+  }
+  return spriteCache.get(path);
+}
+
+function drawSprite(ctx, image, x, y, width, height) {
+  if (!image?.complete || !image.naturalWidth) return false;
+  const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+  const w = image.naturalWidth * scale;
+  const h = image.naturalHeight * scale;
+  ctx.drawImage(image, x - w / 2, y - h / 2, w, h);
+  return true;
+}
+
+function drawRotatedSprite(ctx, image, x, y, width, height, angle) {
   ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  drawSprite(ctx, image, 0, 0, width, height);
   ctx.restore();
 }
 
-function glowCircle(ctx, cx, cy, r, color, alpha = 0.35) {
+function drawSpriteSheet(ctx, image, frameWidth, frameHeight, frame, x, y, width, height) {
+  if (!image?.complete || !image.naturalWidth) return false;
+  const frames = Math.max(1, Math.floor(image.naturalWidth / frameWidth));
+  const index = ((frame % frames) + frames) % frames;
+  const scale = Math.min(width / frameWidth, height / frameHeight);
+  const w = frameWidth * scale;
+  const h = frameHeight * scale;
+  ctx.drawImage(image, index * frameWidth, 0, frameWidth, frameHeight, x - w / 2, y - h / 2, w, h);
+  return true;
+}
+
+function drawPost(ctx, body, radius, brass = false) {
   ctx.save();
-  ctx.globalAlpha = alpha;
-  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  g.addColorStop(0, color);
-  g.addColorStop(1, "transparent");
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.translate(body.position.x, body.position.y);
+  ctx.fillStyle = "#33251d";
+  ctx.beginPath(); ctx.arc(1, 2, radius, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = brass ? "#e8bd56" : "#c9d6d5";
+  ctx.beginPath(); ctx.arc(0, 0, radius - 2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#fff0b2";
+  ctx.beginPath(); ctx.arc(-2, -2, Math.max(1, radius / 3), 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 
-function drawNeonLine(ctx, x1, y1, x2, y2, color, width = 2) {
+function drawFlipper(ctx, body, left) {
   ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = width;
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = color;
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
+  ctx.translate(body.position.x, body.position.y);
+  ctx.rotate(body.angle);
+  ctx.fillStyle = "#33251d";
+  ctx.fillRect(-40, -5, 82, 12);
+  ctx.fillStyle = "#cf3640";
+  ctx.fillRect(-39, -7, 78, 10);
+  ctx.fillStyle = "#f2b84b";
+  ctx.fillRect(-34, -5, 66, 2);
+  ctx.fillStyle = "#f7e7bd";
+  ctx.fillRect(left ? 30 : -36, -5, 7, 2);
+  ctx.fillStyle = "#b9c6c5";
+  ctx.fillRect(left ? -43 : 35, -7, 12, 12);
   ctx.restore();
 }
 
-function drawPlayfieldArt(ctx, W, H, launchCharge, targets) {
-  const {
-    bumpers, wormholeBumper,
-    leftFlagTarget, rightFlagTarget,
-    leftSavePost, rightSavePost,
-    leftLanePost, rightLanePost,
-  } = targets;
+function drawTarget(ctx, body, color, active) {
+  const { x, y } = body.position;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(body.angle);
+  ctx.fillStyle = "#39251b"; ctx.fillRect(-11, -18, 22, 36);
+  ctx.fillStyle = color; ctx.fillRect(-9, -17, 18, 31);
+  ctx.fillStyle = active ? "#fff1b1" : "#f4d986"; ctx.fillRect(-6, -13, 12, 22);
+  ctx.fillStyle = color; ctx.fillRect(-4, -11, 8, 18);
+  ctx.restore();
+}
+
+function drawPlayfieldArt(ctx, W, H, launchCharge, scene) {
+  const { ball, bumpers, wormholeBumper, leftFlagTarget, rightFlagTarget,
+    leftSavePost, rightSavePost, leftLanePost, rightLanePost,
+    leftSling, rightSling, leftFlipper, rightFlipper, plunger, launcherStop,
+    guides, launchLaneWall, effects } = scene;
+  const now = performance.now();
+  const field = loadSprite("playfields/playfield_cosmos_160x256.png");
+  const ballImage = loadSprite("parts/ball_8x8.png");
+  const bumperA = loadSprite("parts/cosmos/bumper_24x24_strip2.png");
+  const bumperB = loadSprite("parts/jungle/bumper_24x24_strip2.png");
+  const plungerImage = loadSprite("parts/plunger_5_10x40.png");
+  const railImage = loadSprite("rails/rail_arc.png");
+  const drainImage = loadSprite("fx/drain_ring_16x16_strip4.png");
 
   ctx.save();
-  ctx.globalCompositeOperation = "destination-over";
-
-  // Deep-space background
-  const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0,    "#00001a");
-  bg.addColorStop(0.35, "#0a0030");
-  bg.addColorStop(0.7,  "#001540");
-  bg.addColorStop(1,    "#000a20");
-  ctx.fillStyle = bg;
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = "#171529";
   ctx.fillRect(0, 0, W, H);
+  // Keep the illustration's 5:8 pixel-art aspect ratio on the 2:3 game canvas.
+  drawSprite(ctx, field, W / 2, H / 2, 375, H);
 
-  // Starfield
-  const stars = [
-    [30,40,1.2,"#fff"],[55,90,0.8,"#adf"],[80,30,1,"#ffd"],
-    [130,55,0.9,"#fff"],[170,22,1.1,"#cff"],[210,70,0.7,"#fff"],
-    [250,38,1,"#ffd"],[290,80,0.8,"#adf"],[320,20,1.2,"#fff"],
-    [60,200,0.8,"#fff"],[100,160,0.7,"#cff"],[150,210,1,"#fff"],
-    [200,180,0.9,"#ffd"],[240,130,0.8,"#fff"],[280,200,1.1,"#adf"],
-    [40,350,0.7,"#fff"],[90,300,1,"#cff"],[190,340,0.8,"#fff"],
-    [240,310,0.9,"#ffd"],[290,360,0.7,"#fff"],
-    [50,460,1,"#fff"],[100,500,0.8,"#adf"],[150,450,0.7,"#cff"],
-    [200,490,1.1,"#fff"],[260,460,0.8,"#ffd"],
-  ];
-  stars.forEach(([x, y, r, c]) => star(ctx, x, y, r, c));
+  // Rails and guides use warm painted metal, with the sample rail tile at the top bends.
+  ctx.strokeStyle = "#392b27"; ctx.lineWidth = 5; ctx.lineCap = "square";
+  guides.forEach((body) => {
+    ctx.save(); ctx.translate(body.position.x, body.position.y); ctx.rotate(body.angle);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    const c = Math.cos(body.angle), s = Math.sin(body.angle);
+    body.vertices.forEach((vertex) => {
+      const dx = vertex.x - body.position.x, dy = vertex.y - body.position.y;
+      const x = dx * c + dy * s, y = -dx * s + dy * c;
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    });
+    const width = maxX - minX, height = maxY - minY;
+    ctx.fillStyle = "#392b27"; ctx.fillRect(-width / 2, -height / 2 - 2, width, height + 5);
+    ctx.fillStyle = "#b5a38a"; ctx.fillRect(-width / 2, -height / 2 - 2, width, 2);
+    ctx.restore();
+  });
+  drawRotatedSprite(ctx, railImage, 48, 42, 48, 48, 0);
+  drawRotatedSprite(ctx, railImage, 352, 42, 48, 48, Math.PI / 2);
 
-  // Playfield polygon
-  ctx.beginPath();
-  [
-    [50, 30],[330, 30],[355, 110],[362, 260],
-    [345, 510],[298, 578],[102, 578],[55, 510],[38, 260],[50, 110],
-  ].forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
-  ctx.closePath();
+  // Bumpers: sample strips provide the actual illustrated bumper faces.
+  bumpers.forEach((body, index) => {
+    const image = index % 2 ? bumperB : bumperA;
+    if (!drawSpriteSheet(ctx, image, 24, 24, Math.floor(now / 180) % 2, body.position.x, body.position.y, body.circleRadius * 2.5, body.circleRadius * 2.5)) {
+      ctx.fillStyle = index % 2 ? "#57954d" : "#574b95";
+      ctx.beginPath(); ctx.arc(body.position.x, body.position.y, body.circleRadius, 0, Math.PI * 2); ctx.fill();
+    }
+  });
+  if (!drawSpriteSheet(ctx, bumperA, 24, 24, Math.floor(now / 180) % 2, wormholeBumper.position.x, wormholeBumper.position.y, 62, 62)) {
+    ctx.fillStyle = "#574b95"; ctx.beginPath(); ctx.arc(wormholeBumper.position.x, wormholeBumper.position.y, 24, 0, Math.PI * 2); ctx.fill();
+  }
 
-  const field = ctx.createLinearGradient(0, 30, 0, 578);
-  field.addColorStop(0,    "#0a0040");
-  field.addColorStop(0.3,  "#001060");
-  field.addColorStop(0.6,  "#001850");
-  field.addColorStop(1,    "#000c30");
-  ctx.fillStyle = field;
-  ctx.fill();
+  drawTarget(ctx, leftFlagTarget, "#d64b42", effects.targetUntil > now);
+  drawTarget(ctx, rightFlagTarget, "#d3a541", effects.targetUntil > now);
+  drawPost(ctx, leftLanePost, 8, true); drawPost(ctx, rightLanePost, 8, true);
+  drawPost(ctx, leftSavePost, 7); drawPost(ctx, rightSavePost, 7);
 
-  // Outer border glow
-  ctx.lineWidth = 8;
-  ctx.strokeStyle = "#0050ff";
-  ctx.shadowBlur = 18;
-  ctx.shadowColor = "#0050ff";
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = "rgba(100,180,255,0.5)";
-  ctx.stroke();
-
-  ctx.globalCompositeOperation = "source-over";
-
-  // Planet / wormhole glow
-  glowCircle(ctx, wormholeBumper.position.x, wormholeBumper.position.y, 60, "#8800ff", 0.25);
-  glowCircle(ctx, wormholeBumper.position.x, wormholeBumper.position.y, 30, "#cc00ff", 0.4);
-
-  // Bumper glows
-  const bumperColors = ["#ffcc00","#00ffcc","#ff4488","#00aaff"];
-  bumpers.forEach((b, i) => glowCircle(ctx, b.position.x, b.position.y, 34, bumperColors[i % 4], 0.3));
-
-  // Flag target indicators
-  [leftFlagTarget, rightFlagTarget].forEach((t, i) => {
-    const col = i === 0 ? "#00ffaa" : "#ff6600";
-    glowCircle(ctx, t.position.x, t.position.y, 22, col, 0.35);
-    ctx.save();
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 1.5;
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = col;
-    ctx.strokeRect(t.position.x - 10, t.position.y - 8, 20, 16);
+  // Slings have brass rails and striped rubber faces.
+  [leftSling, rightSling].forEach((body) => {
+    ctx.save(); ctx.translate(body.position.x, body.position.y); ctx.rotate(body.angle);
+    ctx.fillStyle = "#3b2b22"; ctx.fillRect(-38, -7, 76, 14);
+    ctx.fillStyle = "#d7ad50"; ctx.fillRect(-36, -6, 72, 3);
+    ctx.fillStyle = "#b83d42"; ctx.fillRect(-33, -2, 66, 6);
+    ctx.fillStyle = "#f2d785";
+    for (let x = -28; x <= 24; x += 13) ctx.fillRect(x, -2, 5, 6);
     ctx.restore();
   });
 
-  // Save post pips
-  [leftSavePost, rightSavePost].forEach(p => {
-    glowCircle(ctx, p.position.x, p.position.y, 18, "#ff0088", 0.4);
+  drawFlipper(ctx, leftFlipper, true); drawFlipper(ctx, rightFlipper, false);
+  ctx.fillStyle = "#b58c43"; ctx.fillRect(launcherStop.position.x - 16, launcherStop.position.y - 6, 32, 12);
+  if (!drawSprite(ctx, plungerImage, plunger.position.x, plunger.position.y, 30, 120)) {
+    ctx.fillStyle = "#929ca0"; ctx.fillRect(plunger.position.x - 4, plunger.position.y - 20, 8, 42);
+  }
+  if (launchCharge > 0) {
+    ctx.fillStyle = "#f1c85a";
+    ctx.fillRect(plunger.position.x - 2, plunger.position.y - 26, 4, 25 * launchCharge);
+  }
+
+  // Small launch burst and bumper particles are purely visual.
+  effects.particles.forEach((p) => {
+    const life = Math.max(0, 1 - (now - p.born) / 360);
+    if (life <= 0) return;
+    ctx.globalAlpha = life; ctx.fillStyle = p.color;
+    ctx.fillRect(p.x + p.vx * (now - p.born) / 16, p.y + p.vy * (now - p.born) / 16, 2, 2);
   });
-
-  // Lane post pips
-  [leftLanePost, rightLanePost].forEach(p => {
-    glowCircle(ctx, p.position.x, p.position.y, 16, "#ffdd00", 0.35);
-  });
-
-  // Orbit arc decorations (top)
-  ctx.save();
-  ctx.strokeStyle = "rgba(0,200,255,0.25)";
-  ctx.lineWidth = 3;
-  ctx.setLineDash([8, 6]);
-  ctx.beginPath();
-  ctx.arc(200, 30, 120, 0, Math.PI);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
-
-  // Grid lines (Space Cadet vibe)
-  ctx.save();
-  ctx.strokeStyle = "rgba(0, 80, 200, 0.07)";
-  ctx.lineWidth = 1;
-  for (let y = 60; y < H; y += 40) drawNeonLine(ctx, 40, y, W - 40, y, "rgba(0,80,200,0.06)", 0.5);
-  ctx.restore();
-
-  // Neon inlay: vertical center stripe
-  ctx.save();
-  ctx.strokeStyle = "rgba(0,200,255,0.1)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(W / 2, 60); ctx.lineTo(W / 2, H - 80);
-  ctx.stroke();
-  ctx.restore();
-
-  // Launch charge meter
-  const meterH = 120;
-  const meterX = W - 22;
-  const meterY = H - 170;
-  ctx.save();
-  ctx.strokeStyle = "rgba(255,180,0,0.4)";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(meterX, meterY, 10, meterH);
-  const fillH = meterH * launchCharge;
-  const grad = ctx.createLinearGradient(0, meterY + meterH - fillH, 0, meterY + meterH);
-  grad.addColorStop(0, "#ffdd00");
-  grad.addColorStop(1, "#ff6600");
-  ctx.fillStyle = grad;
-  ctx.fillRect(meterX + 1, meterY + meterH - fillH, 8, fillH);
-  ctx.fillStyle = "rgba(200,220,255,0.7)";
-  ctx.font = "9px monospace";
-  ctx.fillText("PWR", meterX - 4, meterY + meterH + 14);
-  ctx.restore();
-
-  // "SPACE CADET" title insert
-  ctx.save();
-  ctx.fillStyle = "rgba(0,200,255,0.18)";
-  ctx.font = "bold 11px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("SPACE  CADET", W / 2, H - 18);
-  ctx.textAlign = "start";
-  ctx.restore();
-
+  if (effects.launchUntil > now) {
+    drawSpriteSheet(ctx, drainImage, 16, 16, Math.floor((now - effects.launchAt) / 45) % 4, ball.position.x, ball.position.y, 48, 48);
+  }
+  if (!drawSprite(ctx, ballImage, ball.position.x, ball.position.y, 20, 20)) {
+    ctx.fillStyle = "#e8e2d3"; ctx.beginPath(); ctx.arc(ball.position.x, ball.position.y, 10, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -224,7 +212,7 @@ export function createEngine(container, options = {}) {
   const render = Render.create({
     element: container,
     engine,
-    options: { width: W, height: H, wireframes: false, background: "#00001a" },
+    options: { width: W, height: H, wireframes: false, showConstraints: false, background: "#171529" },
   });
 
   let score = 0;
@@ -479,6 +467,8 @@ export function createEngine(container, options = {}) {
     drainSensor,
     ...bumpers,
   ]);
+  // Keep Matter's collision geometry while drawing the art on the custom layer.
+  Matter.Composite.allBodies(engine.world).forEach((body) => { body.render.visible = false; });
 
   // ── Controls ──────────────────────────────────────────────────────────────
   let leftActive    = false;
@@ -486,6 +476,7 @@ export function createEngine(container, options = {}) {
   let launchCharging = false;
   let launchCharge  = 0;
   let pendingLaunch = false;
+  const effects = { particles: [], launchUntil: 0, launchAt: 0, targetUntil: 0 };
 
   const scoreableLabels = new Set(Object.keys(scoreConfig));
 
@@ -548,6 +539,8 @@ export function createEngine(container, options = {}) {
         addScore(scoringBody.label);
       }
 
+      if (scoringBody?.label === "flagTarget") effects.targetUntil = performance.now() + 180;
+
       // Bumper kick
       if (labels.includes("bumper") && labels.includes("ball")) {
         const bumper = bodyA.label === "bumper" ? bodyA : bodyB;
@@ -555,6 +548,13 @@ export function createEngine(container, options = {}) {
         const dy = ball.position.y - bumper.position.y;
         const len = Math.max(Math.hypot(dx, dy), 1);
         Body.applyForce(ball, ball.position, { x: (dx / len) * 0.032, y: (dy / len) * 0.032 });
+        const colors = ["#f3d27c", "#b8d8d2", "#d88c75"];
+        for (let i = 0; i < 7; i++) {
+          const angle = (Math.PI * 2 * i) / 7;
+          effects.particles.push({ x: bumper.position.x, y: bumper.position.y,
+            vx: Math.cos(angle) * 1.6, vy: Math.sin(angle) * 1.6,
+            color: colors[i % colors.length], born: performance.now() });
+        }
       }
 
       // Wormhole kick (stronger, random-ish exit angle)
@@ -564,6 +564,7 @@ export function createEngine(container, options = {}) {
           x: Math.cos(angle) * 12,
           y: Math.sin(angle) * 12,
         });
+        effects.launchAt = performance.now(); effects.launchUntil = effects.launchAt + 200;
       }
 
       // Sling kick
@@ -581,6 +582,9 @@ export function createEngine(container, options = {}) {
 
   // ── Per-frame update ──────────────────────────────────────────────────────
   Events.on(engine, "beforeUpdate", () => {
+    for (let i = effects.particles.length - 1; i >= 0; i--) {
+      if (performance.now() - effects.particles[i].born > 360) effects.particles.splice(i, 1);
+    }
     // Charge / decay
     if (launchCharging && ballIsInLaunchLane()) {
       launchCharge = Math.min(1, launchCharge + 0.018);
@@ -597,6 +601,7 @@ export function createEngine(container, options = {}) {
       });
       pendingLaunch = false;
       launchCharge  = 0;
+      effects.launchAt = performance.now(); effects.launchUntil = effects.launchAt + 220;
     }
 
     // Left flipper
@@ -621,11 +626,12 @@ export function createEngine(container, options = {}) {
   // ── Render hook: canvas art ───────────────────────────────────────────────
   Events.on(render, "afterRender", () => {
     drawPlayfieldArt(render.context, W, H, launchCharge, {
-      bumpers,
-      wormholeBumper,
-      leftFlagTarget, rightFlagTarget,
-      leftSavePost, rightSavePost,
-      leftLanePost, rightLanePost,
+      ball, bumpers, wormholeBumper, leftFlagTarget, rightFlagTarget,
+      leftSavePost, rightSavePost, leftLanePost, rightLanePost,
+      leftSling, rightSling, leftFlipper, rightFlipper, plunger, launcherStop,
+      launchLaneWall,
+      guides: [upperLeftOrbit, upperRightOrbit, lowerLeftGuide, lowerRightGuide, drainGuide, launchLaneWall],
+      effects,
     });
   });
 
