@@ -64,7 +64,7 @@ function drawPost(ctx, body, radius, brass = false) {
   ctx.restore();
 }
 
-function drawFlipper(ctx, body, left) {
+function drawFlipper(ctx, body) {
   ctx.save();
   ctx.translate(body.position.x, body.position.y);
   ctx.rotate(body.angle);
@@ -75,9 +75,9 @@ function drawFlipper(ctx, body, left) {
   ctx.fillStyle = "#f2b84b";
   ctx.fillRect(-34, -5, 66, 2);
   ctx.fillStyle = "#f7e7bd";
-  ctx.fillRect(left ? 30 : -36, -5, 7, 2);
+  ctx.fillRect(29, -5, 7, 2);
   ctx.fillStyle = "#b9c6c5";
-  ctx.fillRect(left ? -43 : 35, -7, 12, 12);
+  ctx.fillRect(-43, -7, 12, 12);
   ctx.restore();
 }
 
@@ -97,7 +97,7 @@ function drawPlayfieldArt(ctx, W, H, launchCharge, scene) {
   const { ball, bumpers, wormholeBumper, leftFlagTarget, rightFlagTarget,
     leftSavePost, rightSavePost, leftLanePost, rightLanePost,
     leftSling, rightSling, leftFlipper, rightFlipper, plunger, launcherStop,
-    guides, launchLaneWall, effects } = scene;
+    guides, effects } = scene;
   const now = performance.now();
   const field = loadSprite("playfields/playfield_cosmos_160x256.png");
   const ballImage = loadSprite("parts/ball_8x8.png");
@@ -190,466 +190,191 @@ function drawPlayfieldArt(ctx, W, H, launchCharge, scene) {
 
 // ─── Engine ──────────────────────────────────────────────────────────────────
 export function createEngine(container, options = {}) {
-  const { Engine, Render, Runner, Bodies, Body, Constraint, World, Events } = Matter;
-  const { onScoreChange = () => {}, scoreConfig = PIECE_SCORES } = options;
-
-  const engine = Engine.create();
-  engine.gravity.y = 0.85;
-
-  const W = 400, H = 600;
-  const ballRadius = 10;
-  const launchLaneWidth = 18;
-  const playfieldShift = -14; // offset to center playfield accounting for launcher
-  const launchX = W - launchLaneWidth / 2 - 8;
-  const launchRestY = H - 80;
-
-  const tableColor  = "#0a0a2e";
-  const wallColor   = "#0d1b4b";
-  const guideColor  = "#1a3a7a";
-  const slingColor  = "#cc0055";
-  const accentColor = "#ff4488";
-
-  const render = Render.create({
-    element: container,
-    engine,
-    options: { width: W, height: H, wireframes: false, showConstraints: false, background: "#171529" },
-  });
-
+  const { Engine, Render, Bodies, Body, World, Events } = Matter;
+  const { onScoreChange = () => {}, scoreConfig = PIECE_SCORES, debug = false } = options;
+  const W = 400, H = 600, ballRadius = 9;
+  // Coordinates are centralized in logical 400×600 pixels.
+  const FIELD = {
+    left: 18, right: 382, divider: 350, launch: { x: 370, y: 520 },
+    bumpers: [{ x: 142, y: 142, r: 18 }, { x: 208, y: 128, r: 18 }, { x: 175, y: 196, r: 19 }],
+    sling: [{ x: 94, y: 370, angle: 0.55 }, { x: 276, y: 370, angle: -0.55 }],
+    flippers: { y: 520, left: { x: 110, rest: 0.26, active: -0.52 }, right: { x: 290, rest: Math.PI - 0.26, active: Math.PI + 0.52 }, length: 84, width: 14 },
+  };
+  const PHYSICS = { gravity: 0.42, maxSpeed: 11, launchMaxSpeed: 32, launchBoostSteps: 45, restitution: 0.42, bumperRestitution: 0.72 };
+  const engine = Engine.create({ enableSleeping: false });
+  engine.gravity.x = 0; engine.gravity.y = PHYSICS.gravity; engine.gravity.scale = 0.001;
+  engine.positionIterations = 8; engine.velocityIterations = 6;
+  const render = Render.create({ element: container, engine, options: { width: W, height: H, wireframes: false, showConstraints: false, background: "#171529", pixelRatio: 1 } });
+  let debugEnabled = Boolean(debug);
   let score = 0;
   const emitScore = () => onScoreChange(score);
-  const addScore  = (key) => { score += scoreConfig[key] ?? 0; emitScore(); };
+  const addScore = (key) => { score += scoreConfig[key] ?? 0; emitScore(); };
+  const ball = Bodies.circle(FIELD.launch.x, FIELD.launch.y, ballRadius, { density: 0.004, restitution: PHYSICS.restitution, friction: 0.02, frictionStatic: 0.04, frictionAir: 0.0025, label: "ball", render: { visible: false } });
+  const wall = (x, y, width, height, angle = 0, label = "wall") => Bodies.rectangle(x, y, width, height, { isStatic: true, angle, label, restitution: 0.28, friction: 0.02, render: { visible: false } });
+  const post = (x, y, r, label) => Bodies.circle(x, y, r, { isStatic: true, label, restitution: 0.45, render: { visible: false } });
 
-  const ballStart = { x: launchX, y: launchRestY };
-  const spawnBall = (ball) => {
-    Body.setPosition(ball, ballStart);
-    Body.setVelocity(ball, { x: 0, y: 0 });
-    Body.setAngularVelocity(ball, 0);
-    Body.setAngle(ball, 0);
-  };
-
-  // ── Ball ──────────────────────────────────────────────────────────────────
-  const ball = Bodies.circle(ballStart.x, ballStart.y, ballRadius, {
-    restitution: 0.9,
-    friction: 0.001,
-    frictionAir: 0.0012,
-    label: "ball",
-    render: { fillStyle: "#c0ffee" },
-  });
-
-  // ── Walls ─────────────────────────────────────────────────────────────────
-  const leftWall  = Bodies.rectangle(-8, H / 2, 20, H,      { isStatic: true, render: { fillStyle: wallColor } });
-  const rightWall = Bodies.rectangle(W + 8, H * 0.66, 20, H, { isStatic: true, render: { fillStyle: wallColor } });
-  const ceiling   = Bodies.rectangle(W / 2, -8, W, 20,      { isStatic: true, render: { fillStyle: wallColor } });
-
-  // ── Top-right curve (circles) ─────────────────────────────────────────────
-  const topCurve = [
-    [W - 8,  90, 14],[W - 11, 78, 14],[W - 16, 66, 15],[W - 24, 55, 15],
-    [W - 34, 46, 16],[W - 46, 38, 17],[W - 60, 31, 18],[W - 76, 26, 19],
-    [W - 94, 22, 20],[W - 113,19, 21],[W - 133,17, 22],
-  ].map(([x, y, r]) => Bodies.circle(x, y, r, { isStatic: true, render: { fillStyle: tableColor } }));
-
-  // ── Launch lane wall ──────────────────────────────────────────────────────
-  const launchLaneWall = Bodies.rectangle(
-    W - launchLaneWidth - 14 + playfieldShift, H * 0.66, 10, H * 0.92,
-    { isStatic: true, render: { fillStyle: guideColor } }
-  );
-
-  // ── Plunger + stop ────────────────────────────────────────────────────────
-  const launcherStop = Bodies.rectangle(launchX, H - 42, 34, 12, {
-    isStatic: true, render: { fillStyle: "#ffaa00" }
-  });
-  const plunger = Bodies.rectangle(launchX, H - 16, 26, 52, {
-    isStatic: true, isSensor: true, label: "plunger",
-    render: { fillStyle: "#ff8800", opacity: 0.9 }
-  });
-
-  // ── Launch turn: redirects ball from chute into playfield ─────────────────
-  const launchTurn = Bodies.rectangle(W - 100 + playfieldShift, 178, 80, 12, {
-    isStatic: true, angle: -0.44, label: "guide",
-    render: { fillStyle: guideColor }
-  });
-
-  // ── Orbit guide: top-left diagonal (upper loop lane) ─────────────────────
-  const upperLeftOrbit = Bodies.rectangle(W * 0.19 + playfieldShift, 96, 130, 12, {
-    isStatic: true, angle: Math.PI / 4.4, label: "orbit",
-    render: { fillStyle: "#1a5099" }
-  });
-
-  // ── Upper right orbit (mirror, redirects back from right wall) ────────────
-  const upperRightOrbit = Bodies.rectangle(W * 0.68 + playfieldShift, 98, 110, 12, {
-    isStatic: true, angle: -Math.PI / 4.2, label: "orbit",
-    render: { fillStyle: "#1a5099" }
-  });
-
-  // ── Center top guide (roof of bumper cluster) ─────────────────────────────
-  const upperCenterGuide = Bodies.rectangle(W * 0.46 + playfieldShift, 134, 108, 12, {
-    isStatic: true, angle: -0.1, label: "guide",
-    render: { fillStyle: guideColor }
-  });
-  // TODO — this is a bit too low and flat, causing some ball hang-ups in the upper zone. Maybe raise it up to 120 and increase the angle slightly?
-  // ── Left-side ramp slope (funnels into bumper zone) ───────────────────────
-  const leftMidSlope = Bodies.rectangle(W * 0.18 + playfieldShift, H * 0.44, 130, 14, {
-    isStatic: true, angle: -Math.PI / 6.5, label: "guide",
-    render: { fillStyle: guideColor }
-  });
-
-  // ── Right-side ramp slope (symmetric) ────────────────────────────────────
-  const rightMidSlope = Bodies.rectangle(W * 0.68 + playfieldShift, H * 0.42, 110, 14, {
-    isStatic: true, angle: Math.PI / 5.5, label: "guide",
-    render: { fillStyle: guideColor }
-  });
-
-  // ── Center fan guide ──────────────────────────────────────────────────────
-  const centerFan = Bodies.rectangle(W * 0.47 + playfieldShift, H * 0.33, 100, 12, {
-    isStatic: true, angle: 0.2, label: "guide",
-    render: { fillStyle: guideColor }
-  });
-
-  // Slingshots raised to H*0.70 and shortened — clear gap below them to flippers
-  const leftSling = Bodies.rectangle(W * 0.20 + playfieldShift, H * 0.70, 72, 13, {
-    isStatic: true, angle: -0.55, label: "sling",
-    render: { fillStyle: slingColor }
-  });
-  const rightSling = Bodies.rectangle(W * 0.66 + playfieldShift, H * 0.70, 72, 13, {
-    isStatic: true, angle: 0.55, label: "sling",
-    render: { fillStyle: slingColor }
-  });
-
-  // ── Lower guides ──────────────────────────────────────────────────────────
-  // Positioned near drain to avoid flipper interference
-  const lowerLeftGuide = Bodies.rectangle(W * 0.12 + playfieldShift, H - 10, 100, 18, {
-    isStatic: true, angle: -0.52,
-    render: { fillStyle: tableColor }
-  });
-  const lowerRightGuide = Bodies.rectangle(W * 0.76 + playfieldShift, H - 10, 100, 18, {
-    isStatic: true, angle: 0.52,
-    render: { fillStyle: tableColor }
-  });
-
-  // Inlane guides raised to H*0.80 with gentler angle — guides ball to flippers
-  const leftInlaneGuide = Bodies.rectangle(W * 0.22 + playfieldShift, H * 0.80, 60, 11, {
-    isStatic: true, angle: 0.72, label: "guide",
-    render: { fillStyle: guideColor }
-  });
-  const rightInlaneGuide = Bodies.rectangle(W * 0.63 + playfieldShift, H * 0.80, 60, 11, {
-    isStatic: true, angle: -0.72, label: "guide",
-    render: { fillStyle: guideColor }
-  });
-
-  // leftLoopReturn removed — was blocking mid-left ball path
-
-  // rightBumperDeflector removed — was cluttering mid-right zone
-
-  // leftFunnelWall / rightFunnelWall removed — were choking flipper approach
-
-  // ── Drain guide ───────────────────────────────────────────────────────────
-  const drainGuide = Bodies.rectangle(W * 0.44 + playfieldShift, H - 6, 136, 10, {
-    isStatic: true, render: { fillStyle: "#1a2c50" }
-  });
-
-  // Save posts raised slightly — H*0.82 gives a clear lane to the flippers
-  const leftSavePost = Bodies.circle(W * 0.20 + playfieldShift, H * 0.82, 10, {
-    isStatic: true, label: "savePost",
-    render: { fillStyle: accentColor, strokeStyle: "#ffaacc", lineWidth: 2 }
-  });
-  const rightSavePost = Bodies.circle(W * 0.69 + playfieldShift, H * 0.82, 10, {
-    isStatic: true, label: "savePost",
-    render: { fillStyle: accentColor, strokeStyle: "#ffaacc", lineWidth: 2 }
-  });
-
-  // ── Lane posts ────────────────────────────────────────────────────────────
-  // Lane posts moved up into the upper-mid zone — clear of flipper path
-  const leftLanePost = Bodies.circle(W * 0.17 + playfieldShift, H * 0.42, 13, {
-    isStatic: true, label: "lanePost", restitution: 1.15,
-    render: { fillStyle: "#ffcc00", strokeStyle: "#fff8aa", lineWidth: 2 }
-  });
-  const rightLanePost = Bodies.circle(W * 0.74 + playfieldShift, H * 0.40, 13, {
-    isStatic: true, label: "lanePost", restitution: 1.15,
-    render: { fillStyle: "#ffcc00", strokeStyle: "#fff8aa", lineWidth: 2 }
-  });
-
-  // midLeftPost / midRightPost removed — were sitting in the drop zone
-
-  // ── Bumpers: tight triangle cluster (upper zone) + one wide bumper ────────
-  const bumpers = [
-    // Top-left of cluster
-    Bodies.circle(W * 0.27 + playfieldShift, 172, 20, {
-      isStatic: true, label: "bumper", restitution: 1.22,
-      render: { fillStyle: "#ffcc00", strokeStyle: "#fff5aa", lineWidth: 3 }
-    }),
-    // Top-right of cluster
-    Bodies.circle(W * 0.50 + playfieldShift, 158, 18, {
-      isStatic: true, label: "bumper", restitution: 1.22,
-      render: { fillStyle: "#00ffcc", strokeStyle: "#aaffee", lineWidth: 3 }
-    }),
-    // Bottom of cluster
-    Bodies.circle(W * 0.36 + playfieldShift, 240, 20, {
-      isStatic: true, label: "bumper", restitution: 1.22,
-      render: { fillStyle: "#ff4488", strokeStyle: "#ffbbdd", lineWidth: 3 }
-    }),
-    // NEW: fourth bumper, right-of-center
-    Bodies.circle(W * 0.60, 218, 18, {
-      isStatic: true, label: "bumper", restitution: 1.22,
-      render: { fillStyle: "#44aaff", strokeStyle: "#aaddff", lineWidth: 3 }
-    }),
+  // Perimeter and shooter lane. The upper edge is formed from adjoining straight
+  // rails for a continuous, predictable curve; the lower side rails leave the drain open.
+  const walls = [
+    wall(9, 300, 18, 600), 
+    wall(391, 300, 18, 600), 
+    wall(200, 5, 370, 14),
+    wall(45, 27, 100, 12, -0.18), 
+    wall(150, 18, 115, 12, -0.04), 
+    wall(267, 21, 115, 12, 0.15), 
+    wall(FIELD.divider, 310, 10, 470, 0, "guide"), 
+    wall(63, 570, 98, 12, -0.22, "guide"), 
+    wall(337, 570, 98, 12, 0.22, "guide"),
   ];
+  const launchTurn = wall(310, 118, 58, 10, -0.62, "guide");
+  const launcherStop = wall(FIELD.launch.x, 557, 34, 10);
+  const plunger = Bodies.rectangle(FIELD.launch.x, 575, 10, 40, { isStatic: true, isSensor: true, label: "plunger", render: { visible: false } });
+  const launchLaneWall = walls.find((body) => body.position.x === FIELD.divider);
+  const bumpers = FIELD.bumpers.map(({ x, y, r }) => Bodies.circle(x, y, r, { isStatic: true, label: "bumper", restitution: PHYSICS.bumperRestitution, render: { visible: false } }));
+  const wormholeBumper = Bodies.circle(208, 277, 18, { isStatic: true, label: "wormhole", restitution: 0.7, render: { visible: false } });
+  const [leftSling, rightSling] = FIELD.sling.map(({ x, y, angle }) => Bodies.rectangle(x, y, 74, 12, { isStatic: true, angle, label: "sling", restitution: 0.42, render: { visible: false } }));
+  const leftLanePost = post(78, 324, 9, "lanePost"), rightLanePost = post(292, 324, 9, "lanePost");
+  const leftSavePost = post(90, 535, 8, "savePost"), rightSavePost = post(310, 535, 8, "savePost");
+  const leftFlagTarget = wall(82, 245, 14, 32, 0, "flagTarget"), rightFlagTarget = wall(294, 245, 14, 32, 0, "flagTarget");
+  const lowerLeftGuide = wall(52, 468, 66, 10, 0.65, "guide");
+  const lowerRightGuide = wall(310, 468, 66, 10, -0.65, "guide");
+  const leftInlaneGuide = wall(97, 510, 45, 9, -0.5, "guide"), rightInlaneGuide = wall(303, 510, 45, 9, 0.5, "guide");
+  const drainSensor = Bodies.rectangle(200, 615, 130, 32, { isStatic: true, isSensor: true, label: "drain", render: { visible: false } });
 
-  // ── NEW: Wormhole bumper (center-field, large, high-value) ───────────────
-  const wormholeBumper = Bodies.circle(W * 0.46 + playfieldShift, H * 0.55, 24, {
-    isStatic: true, label: "wormhole", restitution: 1.3,
-    render: { fillStyle: "#6600cc", strokeStyle: "#dd88ff", lineWidth: 4 }
-  });
+  // Kinematic bodies are stepped about fixed pivots. Their artwork uses the same
+  // body angle and center, so visual and collision geometry cannot diverge.
+  const makeFlipper = (side) => {
+    const spec = FIELD.flippers[side];
+    const body = Bodies.rectangle(0, 0, FIELD.flippers.length, FIELD.flippers.width, { density: 0.006, friction: 0.02, frictionAir: 0.03, restitution: 0.12, chamfer: { radius: 6 }, label: "flipper", render: { visible: false } });
+    body.plugin.flipper = { pivot: { x: spec.x, y: FIELD.flippers.y }, side, rest: spec.rest, active: spec.active, min: Math.min(spec.rest, spec.active), max: Math.max(spec.rest, spec.active) };
+    return body;
+  };
+  const leftFlipper = makeFlipper("left"), rightFlipper = makeFlipper("right");
+  const placeFlipper = (body, angle, updateVelocity = false) => {
+    const f = body.plugin.flipper;
+    Body.setAngle(body, angle, updateVelocity);
+    Body.setPosition(body, {
+      x: f.pivot.x + Math.cos(angle) * FIELD.flippers.length / 2,
+      y: f.pivot.y + Math.sin(angle) * FIELD.flippers.length / 2,
+    }, updateVelocity);
+  };
+  placeFlipper(leftFlipper, leftFlipper.plugin.flipper.rest); placeFlipper(rightFlipper, rightFlipper.plugin.flipper.rest);
+  World.add(engine.world, [ball, ...walls, launchTurn, launcherStop, plunger, ...bumpers, wormholeBumper, leftSling, rightSling, leftLanePost, rightLanePost, leftSavePost, rightSavePost, leftFlagTarget, rightFlagTarget, lowerLeftGuide, lowerRightGuide, leftInlaneGuide, rightInlaneGuide, drainSensor, leftFlipper, rightFlipper]);
 
-  // ── NEW: Flag targets (small rectangular hit boxes, like Space Cadet) ─────
-  const leftFlagTarget = Bodies.rectangle(W * 0.15 + playfieldShift, H * 0.35, 18, 34, {
-    isStatic: true, label: "flagTarget",
-    render: { fillStyle: "#00cc66", strokeStyle: "#aaffcc", lineWidth: 2 }
-  });
-  const rightFlagTarget = Bodies.rectangle(W * 0.76 + playfieldShift, H * 0.32, 18, 34, {
-    isStatic: true, label: "flagTarget",
-    render: { fillStyle: "#ff6600", strokeStyle: "#ffcc88", lineWidth: 2 }
-  });
-
-  // ── Flippers ──────────────────────────────────────────────────────────────
-  const flipperLength = 82;
-  const flipperWidth  = 14;
-  const flipperY      = H - 58;
-  const leftFlipper = Bodies.rectangle(W * 0.345 + playfieldShift, flipperY, flipperLength, flipperWidth, {
-    density: 0.002, label: "flipper",
-    chamfer: { radius: 6 },
-    render: { fillStyle: "#ee0055" }
-  });
-  const rightFlipper = Bodies.rectangle(W * 0.655 + playfieldShift, flipperY, flipperLength, flipperWidth, {
-    density: 0.002, label: "flipper",
-    chamfer: { radius: 6 },
-    render: { fillStyle: "#ee0055" }
-  });
-
-  const leftPivot = Constraint.create({
-    pointA: { x: W * 0.27 + playfieldShift, y: flipperY },
-    bodyB: leftFlipper,
-    pointB: { x: -flipperLength / 2, y: 0 },
-    stiffness: 1,
-  });
-  const rightPivot = Constraint.create({
-    pointA: { x: W * 0.73 + playfieldShift, y: flipperY },
-    bodyB: rightFlipper,
-    pointB: { x: flipperLength / 2, y: 0 },
-    stiffness: 1,
-  });
-
-  // ── Drain sensor ──────────────────────────────────────────────────────────
-  const drainSensor = Bodies.rectangle(W / 2 + playfieldShift, H + 36, W, 40, {
-    isStatic: true, isSensor: true, label: "drain",
-    render: { visible: false }
-  });
-
-  // ── World assembly ────────────────────────────────────────────────────────
-  World.add(engine.world, [
-    ball,
-    leftWall, rightWall, ceiling,
-    ...topCurve,
-    launchLaneWall, launcherStop, plunger,
-    // launchTurn,
-    upperLeftOrbit, upperRightOrbit, // upperCenterGuide,
-    // leftMidSlope, rightMidSlope, // centerFan,
-
-    leftSling, rightSling,
-    leftLanePost, rightLanePost,
-    leftSavePost, rightSavePost,
-    lowerLeftGuide, lowerRightGuide,
-    // leftInlaneGuide, rightInlaneGuide, // above flippers
-    wormholeBumper,
-    leftFlagTarget, rightFlagTarget,
-    drainGuide,
-    leftFlipper, rightFlipper,
-    leftPivot, rightPivot,
-    drainSensor,
-    ...bumpers,
-  ]);
-  // Keep Matter's collision geometry while drawing the art on the custom layer.
-  Matter.Composite.allBodies(engine.world).forEach((body) => { body.render.visible = false; });
-
-  // ── Controls ──────────────────────────────────────────────────────────────
-  let leftActive    = false;
-  let rightActive   = false;
-  let launchCharging = false;
-  let launchCharge  = 0;
-  let pendingLaunch = false;
   const effects = { particles: [], launchUntil: 0, launchAt: 0, targetUntil: 0 };
-
-  const scoreableLabels = new Set(Object.keys(scoreConfig));
-
-  const ballIsInLaunchLane = () =>
-    ball.position.x > W - launchLaneWidth - 22 && ball.position.y > H * 0.55;
-
+  const guides = [launchTurn, launchLaneWall, lowerLeftGuide, lowerRightGuide, leftInlaneGuide, rightInlaneGuide];
+  const scoreCooldowns = new Map();
+  let leftActive = false, rightActive = false, launchCharging = false, launchCharge = 0, pendingLaunch = false, launched = false, launchBoostSteps = 0, launchTransferred = false;
+  let destroyed = false, raf = 0, accumulator = 0, lastTime = 0;
+  const ballIsInLaunchLane = () => !launched && ball.position.x > 355 && ball.position.y > 470;
   const resetBall = ({ resetScore = false } = {}) => {
     if (resetScore) { score = 0; emitScore(); }
-    launchCharge = 0;
-    launchCharging = false;
-    pendingLaunch = false;
-    leftActive = false;
-    rightActive = false;
-    Body.setAngularVelocity(leftFlipper, 0);
-    Body.setAngularVelocity(rightFlipper, 0);
-    Body.setAngle(leftFlipper, -0.3);
-    Body.setAngle(rightFlipper, 0.3);
-    spawnBall(ball);
+    launchCharge = 0; launchCharging = false; pendingLaunch = false; leftActive = false; rightActive = false; launched = false; launchBoostSteps = 0; launchTransferred = false;
+    Body.setPosition(ball, FIELD.launch); Body.setVelocity(ball, { x: 0, y: 0 }); Body.setAngularVelocity(ball, 0);
+    ball.force.x = 0; ball.force.y = 0; ball.torque = 0;
+    accumulator = 0; lastTime = 0; effects.particles.length = 0;
+    placeFlipper(leftFlipper, leftFlipper.plugin.flipper.rest); placeFlipper(rightFlipper, rightFlipper.plugin.flipper.rest); scoreCooldowns.clear();
   };
-
+  const clearInput = () => { leftActive = false; rightActive = false; launchCharging = false; };
   const handleKeyDown = (e) => {
-    if (e.code === "ArrowLeft")  { e.preventDefault(); leftActive = true; }
+    if (e.code === "ArrowLeft") { e.preventDefault(); leftActive = true; }
     if (e.code === "ArrowRight") { e.preventDefault(); rightActive = true; }
-    if (e.code === "Space") {
-      e.preventDefault();
-      if (ballIsInLaunchLane()) launchCharging = true;
-    }
-  };
-
-  const handleKeyUp = (e) => {
-    if (e.code === "ArrowLeft")  { e.preventDefault(); leftActive = false; }
-    if (e.code === "ArrowRight") { e.preventDefault(); rightActive = false; }
-    if (e.code === "Space") {
-      e.preventDefault();
-      if (launchCharging && ballIsInLaunchLane()) pendingLaunch = true;
-      launchCharging = false;
-    }
+    if (e.code === "Space") { e.preventDefault(); if (ballIsInLaunchLane()) launchCharging = true; }
     if (e.code === "KeyR") { e.preventDefault(); resetBall({ resetScore: true }); }
   };
-
-  window.addEventListener("keydown", handleKeyDown);
-  window.addEventListener("keyup", handleKeyUp);
-
-  Body.setAngle(leftFlipper,  -0.3);
-  Body.setAngle(rightFlipper,  0.3);
-
-  // ── Collision events ──────────────────────────────────────────────────────
-  Events.on(engine, "collisionStart", ({ pairs }) => {
-    pairs.forEach(({ bodyA, bodyB }) => {
-      const labels = [bodyA.label, bodyB.label];
-
-      if (labels.includes("drain") && labels.includes("ball")) {
-        resetBall();
-        return;
-      }
-
-      const scoringBody = bodyA.label === "ball" ? bodyB
-                        : bodyB.label === "ball" ? bodyA : null;
-      if (scoringBody && scoreableLabels.has(scoringBody.label)) {
-        addScore(scoringBody.label);
-      }
-
-      if (scoringBody?.label === "flagTarget") effects.targetUntil = performance.now() + 180;
-
-      // Bumper kick
-      if (labels.includes("bumper") && labels.includes("ball")) {
-        const bumper = bodyA.label === "bumper" ? bodyA : bodyB;
-        const dx = ball.position.x - bumper.position.x;
-        const dy = ball.position.y - bumper.position.y;
-        const len = Math.max(Math.hypot(dx, dy), 1);
-        Body.applyForce(ball, ball.position, { x: (dx / len) * 0.032, y: (dy / len) * 0.032 });
+  const handleKeyUp = (e) => {
+    if (e.code === "ArrowLeft") { e.preventDefault(); leftActive = false; }
+    if (e.code === "ArrowRight") { e.preventDefault(); rightActive = false; }
+    if (e.code === "Space") { e.preventDefault(); if (launchCharging && ballIsInLaunchLane()) pendingLaunch = true; launchCharging = false; }
+  };
+  window.addEventListener("keydown", handleKeyDown); window.addEventListener("keyup", handleKeyUp); window.addEventListener("blur", clearInput);
+  const scoreable = new Set(Object.keys(scoreConfig));
+  Events.on(engine, "collisionStart", ({ pairs }) => pairs.forEach(({ bodyA, bodyB }) => {
+    const other = bodyA === ball ? bodyB : bodyB === ball ? bodyA : null;
+    if (!other) return;
+    if (other.label === "drain") { resetBall(); return; }
+    const now = performance.now(), until = scoreCooldowns.get(other.id) || 0;
+    if (scoreable.has(other.label) && now >= until) { addScore(other.label); scoreCooldowns.set(other.id, now + 240); }
+    if (other.label === "flagTarget") effects.targetUntil = now + 180;
+    if (other.label === "bumper" || other.label === "wormhole") {
+      const dx = ball.position.x - other.position.x, dy = ball.position.y - other.position.y, len = Math.max(1, Math.hypot(dx, dy));
+      const v = ball.velocity, toward = (v.x * dx + v.y * dy) / len;
+      if (toward < 2.8) Body.setVelocity(ball, { x: v.x + dx / len * (2.8 - toward), y: v.y + dy / len * (2.8 - toward) });
+      if (other.label === "bumper") {
         const colors = ["#f3d27c", "#b8d8d2", "#d88c75"];
-        for (let i = 0; i < 7; i++) {
-          const angle = (Math.PI * 2 * i) / 7;
-          effects.particles.push({ x: bumper.position.x, y: bumper.position.y,
-            vx: Math.cos(angle) * 1.6, vy: Math.sin(angle) * 1.6,
-            color: colors[i % colors.length], born: performance.now() });
-        }
+        for (let i = 0; i < 6; i++) { const angle = Math.PI * 2 * i / 6; effects.particles.push({ x: other.position.x, y: other.position.y, vx: Math.cos(angle), vy: Math.sin(angle), color: colors[i % colors.length], born: now }); }
       }
-
-      // Wormhole kick (stronger, random-ish exit angle)
-      if (labels.includes("wormhole") && labels.includes("ball")) {
-        const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
-        Body.setVelocity(ball, {
-          x: Math.cos(angle) * 12,
-          y: Math.sin(angle) * 12,
-        });
-        effects.launchAt = performance.now(); effects.launchUntil = effects.launchAt + 200;
-      }
-
-      // Sling kick
-      if (labels.includes("sling") && labels.includes("ball")) {
-        const sling = bodyA.label === "sling" ? bodyA : bodyB;
-        const dx = ball.position.x - sling.position.x;
-        const dy = ball.position.y - sling.position.y;
-        const len = Math.max(Math.hypot(dx, dy), 1);
-        Body.applyForce(ball, ball.position, { x: (dx / len) * 0.025, y: (dy / len) * 0.025 });
-      }
-    });
-  });
-
+    }
+    if (other.label === "sling") Body.setVelocity(ball, { x: ball.velocity.x + (other === leftSling ? 1 : -1) * 1.2, y: Math.min(ball.velocity.y, -2.8) });
+  }));
   emitScore();
 
-  // ── Per-frame update ──────────────────────────────────────────────────────
-  Events.on(engine, "beforeUpdate", () => {
-    for (let i = effects.particles.length - 1; i >= 0; i--) {
-      if (performance.now() - effects.particles[i].born > 360) effects.particles.splice(i, 1);
-    }
-    // Charge / decay
-    if (launchCharging && ballIsInLaunchLane()) {
-      launchCharge = Math.min(1, launchCharge + 0.018);
-    } else if (!launchCharging) {
-      launchCharge = Math.max(0, launchCharge - 0.04);
-    }
-
-    Body.setPosition(plunger, { x: launchX, y: H - 16 + launchCharge * 28 });
-
-    if (pendingLaunch && ballIsInLaunchLane()) {
-      Body.setVelocity(ball, {
-        x: -3.0 - launchCharge * 3.2,
-        y: -10  - launchCharge * 14,
-      });
-      pendingLaunch = false;
-      launchCharge  = 0;
-      effects.launchAt = performance.now(); effects.launchUntil = effects.launchAt + 220;
-    }
-
-    // Left flipper
-    if (leftActive) {
-      if (leftFlipper.angle > -0.82) Body.setAngularVelocity(leftFlipper, -0.42);
-      else Body.setAngularVelocity(leftFlipper, 0);
-    } else {
-      if (leftFlipper.angle < -0.2) Body.setAngularVelocity(leftFlipper, 0.22);
-      else { Body.setAngularVelocity(leftFlipper, 0); Body.setAngle(leftFlipper, -0.2); }
-    }
-
-    // Right flipper
-    if (rightActive) {
-      if (rightFlipper.angle < 0.82) Body.setAngularVelocity(rightFlipper, 0.42);
-      else Body.setAngularVelocity(rightFlipper, 0);
-    } else {
-      if (rightFlipper.angle > 0.2) Body.setAngularVelocity(rightFlipper, -0.22);
-      else { Body.setAngularVelocity(rightFlipper, 0); Body.setAngle(rightFlipper, 0.2); }
-    }
-  });
-
-  // ── Render hook: canvas art ───────────────────────────────────────────────
+  // Fixed 120 Hz physics, capped catch-up, and an independent render loop.
+  const stepMs = 1000 / 120;
   Events.on(render, "afterRender", () => {
-    drawPlayfieldArt(render.context, W, H, launchCharge, {
-      ball, bumpers, wormholeBumper, leftFlagTarget, rightFlagTarget,
-      leftSavePost, rightSavePost, leftLanePost, rightLanePost,
-      leftSling, rightSling, leftFlipper, rightFlipper, plunger, launcherStop,
-      launchLaneWall,
-      guides: [upperLeftOrbit, upperRightOrbit, lowerLeftGuide, lowerRightGuide, drainGuide, launchLaneWall],
-      effects,
-    });
+    drawPlayfieldArt(render.context, W, H, launchCharge, { ball, bumpers, wormholeBumper, leftFlagTarget, rightFlagTarget, leftSavePost, rightSavePost, leftLanePost, rightLanePost, leftSling, rightSling, leftFlipper, rightFlipper, plunger, launcherStop, launchLaneWall, guides, effects });
+    if (debugEnabled) drawPhysicsDebug(render.context, engine, ball, FIELD, [leftFlipper, rightFlipper]);
   });
-
-  Render.run(render);
-  const runner = Runner.create();
-  Runner.run(runner, engine);
-
+  const tick = (time) => {
+    if (destroyed) return;
+    if (!lastTime) lastTime = time;
+    accumulator += Math.min(50, time - lastTime); lastTime = time;
+    while (accumulator >= stepMs) {
+      if (launchCharging && ballIsInLaunchLane()) launchCharge = Math.min(1, launchCharge + 0.0085);
+      if (pendingLaunch && ballIsInLaunchLane()) {
+        Body.setVelocity(ball, { x: 0, y: -(24 + launchCharge * 6) });
+        launched = true; pendingLaunch = false; launchBoostSteps = PHYSICS.launchBoostSteps;
+        launchCharge = 0; effects.launchAt = performance.now(); effects.launchUntil = effects.launchAt + 220;
+      }
+      const moveFlipper = (body, pressed) => {
+        const f = body.plugin.flipper, target = pressed ? f.active : f.rest, delta = target - body.angle, step = pressed ? 0.06 : 0.075;
+        const next = Math.abs(delta) <= step ? target : body.angle + Math.sign(delta) * step;
+        placeFlipper(body, Math.max(f.min, Math.min(f.max, next)), true);
+      };
+      moveFlipper(leftFlipper, leftActive); moveFlipper(rightFlipper, rightActive);
+      Body.setPosition(plunger, { x: FIELD.launch.x, y: 575 + launchCharge * 22 });
+      Engine.update(engine, stepMs);
+      if (launched && !launchTransferred && ball.position.y < 60) {
+        Body.setVelocity(ball, { x: -8, y: ball.velocity.y });
+        launchTransferred = true;
+      }
+      const speed = Math.hypot(ball.velocity.x, ball.velocity.y);
+      const maxSpeed = launchBoostSteps > 0 ? PHYSICS.launchMaxSpeed : PHYSICS.maxSpeed;
+      if (speed > maxSpeed) Body.setVelocity(ball, { x: ball.velocity.x * maxSpeed / speed, y: ball.velocity.y * maxSpeed / speed });
+      if (launchBoostSteps > 0) launchBoostSteps--;
+      accumulator -= stepMs;
+    }
+    for (let i = effects.particles.length - 1; i >= 0; i--) if (performance.now() - effects.particles[i].born > 360) effects.particles.splice(i, 1);
+    raf = requestAnimationFrame(tick);
+  };
+  Render.run(render); raf = requestAnimationFrame(tick);
   return {
-    engine, render, runner,
+    engine, render, runner: null,
     getScore() { return score; },
-    restart()  { resetBall({ resetScore: true }); },
-    destroy()  {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup",   handleKeyUp);
-      Render.stop(render);
-      Runner.stop(runner);
-      World.clear(engine.world, false);
-      Engine.clear(engine);
+    restart() { resetBall({ resetScore: true }); },
+    setDebug(value) { debugEnabled = Boolean(value); },
+    destroy() {
+      destroyed = true; cancelAnimationFrame(raf);
+      window.removeEventListener("keydown", handleKeyDown); window.removeEventListener("keyup", handleKeyUp); window.removeEventListener("blur", clearInput);
+      Events.off(engine); Render.stop(render); World.clear(engine.world, false); Engine.clear(engine);
     },
   };
+}
+
+function drawPhysicsDebug(ctx, engine, ball, field, flippers) {
+  ctx.save(); ctx.strokeStyle = "rgba(80,255,210,.75)"; ctx.fillStyle = "#fff"; ctx.lineWidth = 1;
+  Matter.Composite.allBodies(engine.world).forEach((body) => {
+    ctx.strokeStyle = body.isSensor ? "rgba(255,120,190,.9)" : "rgba(80,255,210,.75)";
+    ctx.beginPath(); body.vertices.forEach((v, i) => i ? ctx.lineTo(v.x, v.y) : ctx.moveTo(v.x, v.y)); ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(body.position.x, body.position.y, 2, 0, Math.PI * 2); ctx.fill();
+    if (body.label !== "wall") ctx.fillText(body.label, body.position.x + 4, body.position.y - 4);
+  });
+  flippers.forEach((body) => {
+    const f = body.plugin.flipper; ctx.beginPath(); ctx.arc(f.pivot.x, f.pivot.y, 4, 0, Math.PI * 2); ctx.stroke();
+    [f.min, f.max].forEach((angle) => { ctx.beginPath(); ctx.moveTo(f.pivot.x, f.pivot.y); ctx.lineTo(f.pivot.x + Math.cos(angle) * field.flippers.length, f.pivot.y + Math.sin(angle) * field.flippers.length); ctx.stroke(); });
+  });
+  ctx.beginPath(); ctx.moveTo(ball.position.x, ball.position.y); ctx.lineTo(ball.position.x + ball.velocity.x * 5, ball.position.y + ball.velocity.y * 5); ctx.stroke();
+  ctx.fillText(`v (${ball.velocity.x.toFixed(1)}, ${ball.velocity.y.toFixed(1)})`, ball.position.x + 10, ball.position.y - 12);
+  ctx.strokeRect(field.divider - 5, 75, 10, 470);
+  ctx.restore();
 }

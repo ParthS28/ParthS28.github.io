@@ -5,12 +5,13 @@ function PinballCanvas() {
   const sceneRef = useRef(null);
   const engineRef = useRef(null);
   const [score, setScore] = useState(0);
+  const [debug, setDebug] = useState(false);
 
   useEffect(() => {
-    const { render, destroy, restart } = createEngine(sceneRef.current, {
+    const { render, destroy, restart, setDebug: setEngineDebug } = createEngine(sceneRef.current, {
       onScoreChange: setScore,
     });
-    engineRef.current = { restart };
+    engineRef.current = { restart, setDebug: setEngineDebug };
 
     return () => {
       engineRef.current = null;
@@ -70,6 +71,18 @@ function PinballCanvas() {
               <div>Space charge launch</div>
               <div>R restart game</div>
             </div>
+            <button
+              type="button"
+              aria-pressed={debug}
+              onClick={() => {
+                const enabled = !debug;
+                setDebug(enabled);
+                engineRef.current?.setDebug(enabled);
+              }}
+              className="mt-4 rounded-lg border border-cyan-300/25 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:border-cyan-200/60"
+            >
+              Debug {debug ? "on" : "off"}
+            </button>
           </div>
           <div className="rounded-2xl border border-cyan-300/15 bg-[#0b1021] px-4 py-4 text-left">
             <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/45">Mode</div>
